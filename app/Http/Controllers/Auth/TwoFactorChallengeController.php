@@ -13,8 +13,8 @@ class TwoFactorChallengeController extends Controller
 {
     public function token(Request $request): JsonResponse
     {
-        return LoginChallenge::consume($request, 'stateless', function (User $user, object $challenge) {
-            return response()->json(['token' => $user->createToken($challenge->device_name)->plainTextToken]);
+        return LoginChallenge::consume($request, 'stateless', function (User $user, object $challenge) use ($request) {
+            return response()->json(['token' => \App\Support\Auth\DeviceTokens::issue($user, $request, $challenge->device_name)->plainTextToken]);
         });
     }
 

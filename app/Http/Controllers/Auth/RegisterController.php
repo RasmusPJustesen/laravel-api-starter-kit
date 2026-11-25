@@ -22,7 +22,7 @@ class RegisterController extends Controller
         [$user, $token] = DB::transaction(function () use ($request): array {
             $user = User::create($request->validated());
 
-            return [$user, $user->createToken($request->string('device_name', 'auth'))->plainTextToken];
+            return [$user, \App\Support\Auth\DeviceTokens::issue($user, $request, (string) $request->string('device_name', 'auth'))->plainTextToken];
         });
 
         event(new Registered($user));

@@ -49,6 +49,13 @@ Route::middleware('auth:sanctum')->group(function () {
     }
     Route::post('token/refresh', RefreshTokenController::class)->name('token.refresh');
 
+    Route::get('user/sessions', [\App\Http\Controllers\Auth\SessionController::class, 'index']);
+    Route::middleware('password.confirmed')->group(function (): void {
+        Route::delete('user/sessions/others', [\App\Http\Controllers\Auth\SessionController::class, 'others']);
+        Route::delete('user/sessions/{session}', [\App\Http\Controllers\Auth\SessionController::class, 'destroy']);
+        Route::patch('user/sessions/{session}', [\App\Http\Controllers\Auth\SessionController::class, 'update']);
+    });
+
     Route::get('me', [ProfileController::class, 'show'])->name('profile.show');
     Route::patch('user', [ProfileController::class, 'update'])->name('profile.update');
 

@@ -19,13 +19,15 @@ class RefreshTokenController extends Controller
 
         $current = $user->currentAccessToken();
         abort_unless($current instanceof \Laravel\Sanctum\PersonalAccessToken, 403);
-        $name = $current->name;
-        $abilities = $current->abilities ?? ['*'];
+        $token = DB::transaction(function () use ($request, $user, $current): string {
+            $locked = $user->tokens()->lockForUpdate()->find($current->getKey());
+            abort_unless($locked, 401);
+            $name = $locked->name;
+            $abilities = $locked->abilities ?? ['*'];
+            $deviceId = $locked->device_id;
+            $locked->delete();
 
-        $token = DB::transaction(function () use ($user, $name, $abilities): string {
-            $user->currentAccessToken()->delete();
-
-            return $user->createToken($name, $abilities)->plainTextToken;
+            return \App\Support\Auth\DeviceTokens::issue($user, $request, $name, $abilities, $deviceId)->plainTextToken;
         });
 
         return response()->json(['token' => $token]);

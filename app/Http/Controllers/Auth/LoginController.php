@@ -42,7 +42,7 @@ class LoginController extends Controller
             return response()->json(\App\Support\Auth\LoginChallenge::issue($user, $request, 'stateless'), 202);
         }
 
-        $token = $user->createToken($request->string('device_name', 'auth'))->plainTextToken;
+        $token = \App\Support\Auth\DeviceTokens::issue($user, $request, (string) $request->string('device_name', 'auth'))->plainTextToken;
 
         return response()->json(['token' => $token]);
     }

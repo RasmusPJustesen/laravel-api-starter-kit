@@ -47,9 +47,15 @@ class ProfileController extends Controller
         $user = $request->user();
 
         DB::transaction(function () use ($user): void {
-            $user->tokens()->delete();
+            \App\Support\Auth\Credentials::revokeAll($user);
             $user->delete();
         });
+
+        if ($request->hasSession()) {
+            \Illuminate\Support\Facades\Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
 
         return response()->noContent();
     }

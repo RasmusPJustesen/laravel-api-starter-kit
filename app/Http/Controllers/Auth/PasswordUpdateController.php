@@ -22,8 +22,14 @@ class PasswordUpdateController extends Controller
                 'password' => $request->validated('password'),
             ]);
 
-            $user->tokens()->delete();
+            \App\Support\Auth\Credentials::revokeAll($user);
         });
+
+        if ($request->hasSession()) {
+            \Illuminate\Support\Facades\Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
 
         return new MessageResponse('Password updated successfully.');
     }

@@ -33,6 +33,7 @@ class SecurityRegressionTest extends TestCase
         $this->withToken($token)->postJson('/user/two-factor-authentication')->assertForbidden();
         $this->withToken($token)->postJson('/user/confirm-password', ['password' => 'password'])->assertNoContent();
         $this->withToken($token)->postJson('/user/two-factor-authentication')->assertNoContent();
+        auth()->forgetGuards();
         $setup = $this->withToken($token)->getJson('/user/two-factor-secret-key')->assertOk()->json();
         $this->assertStringStartsWith('otpauth://', $setup['url']);
         $this->assertNotSame($setup['secret'], $user->fresh()->two_factor_secret);
@@ -42,6 +43,7 @@ class SecurityRegressionTest extends TestCase
         $this->withToken($token)->postJson('/user/confirmed-two-factor-authentication', ['code' => $code])->assertNoContent();
         $this->assertNotNull($user->fresh()->two_factor_confirmed_at);
         $this->assertModelMissing($other->accessToken);
+        auth()->forgetGuards();
         $this->withToken($token)->getJson('/user/two-factor-secret-key')->assertConflict();
         $codes = $this->withToken($token)->getJson('/user/two-factor-recovery-codes')->assertOk()->json('codes');
         $this->assertCount(8, $codes);

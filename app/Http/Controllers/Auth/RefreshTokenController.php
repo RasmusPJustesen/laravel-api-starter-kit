@@ -18,6 +18,7 @@ class RefreshTokenController extends Controller
         $user = $request->user();
 
         $current = $user->currentAccessToken();
+        abort_unless($current instanceof \Laravel\Sanctum\PersonalAccessToken, 403);
         $name = $current->name;
         $abilities = $current->abilities ?? ['*'];
 

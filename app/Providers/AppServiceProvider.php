@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\FrontendClients;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\DevCommands;
@@ -28,9 +29,7 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
 
         ResetPassword::createUrlUsing(function ($user, string $token): string {
-            $client = config('frontends.clients.'.config('frontends.default'));
-
-            return rtrim($client['url'], '/').'/'.ltrim($client['password_reset_path'], '/').'?'.http_build_query([
+            return FrontendClients::url(request(), 'password_reset_path', [
                 'token' => $token,
                 'email' => $user->getEmailForPasswordReset(),
             ]);

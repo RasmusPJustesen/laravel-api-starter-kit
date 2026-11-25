@@ -36,8 +36,9 @@ final class LoginChallenge
 
         return DB::transaction(function () use ($data, $mode, $authenticate) {
             $id = hash('sha256', $data['challenge_token']);
+            $candidate = DB::table('authentication_challenges')->where('id', $id)->first();
+            $user = $candidate ? User::query()->lockForUpdate()->find($candidate->user_id) : null;
             $challenge = DB::table('authentication_challenges')->where('id', $id)->lockForUpdate()->first();
-            $user = $challenge ? User::query()->lockForUpdate()->find($challenge->user_id) : null;
 
             if (! $challenge || ! $user || $challenge->mode !== $mode ||
                 now()->gte($challenge->expires_at) ||

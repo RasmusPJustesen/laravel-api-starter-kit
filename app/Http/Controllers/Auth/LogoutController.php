@@ -19,6 +19,7 @@ class LogoutController extends Controller
         if ($token instanceof \Laravel\Sanctum\PersonalAccessToken) {
             $token->delete();
         } else {
+            \App\Support\Auth\BrowserDevices::logout($request);
             \Illuminate\Support\Facades\Auth::guard('web')->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();

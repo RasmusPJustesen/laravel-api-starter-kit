@@ -41,9 +41,22 @@ class SessionController extends Controller
             ]];
         }
 
+        foreach (\App\Support\Auth\BrowserDevices::active(\App\Support\Auth\BrowserDevices::table()->where('user_id', $user->getKey()))->get() as $device) {
+            $items[] = ['key' => $device->id, 'kind' => 'browser', 'data' => [
+                'id' => $this->opaque('browser', $device->id),
+                'name' => $device->name,
+                'authentication_type' => 'cookie',
+                'client_id' => $device->client_id,
+                'ip_address' => $device->ip_address,
+                'user_agent' => $device->user_agent,
+                'last_active_at' => \Illuminate\Support\Carbon::parse($device->last_active_at)->toISOString(),
+                'is_current' => ! ($current instanceof PersonalAccessToken) && $request->hasSession() && $request->session()->get('browser_device_id') === $device->id,
+            ]];
+        }
+
         if (config('session.driver') === 'database') {
             $sessions = Credentials::sessions()->where('user_id', $user->getKey())
-                ->where('last_activity', '>', now()->subMinutes(config('session.lifetime'))->timestamp)->get();
+                ->whereNotIn('id', \App\Support\Auth\BrowserDevices::table()->whereNotNull('session_id')->select('session_id'))->where('last_activity', '>', now()->subMinutes(config('session.lifetime'))->timestamp)->get();
 
             foreach ($sessions as $session) {
                 $items[] = ['key' => $session->id, 'kind' => 'session', 'data' => [
@@ -76,6 +89,13 @@ class SessionController extends Controller
         DB::transaction(function () use ($request, $record): void {
             if ($record['kind'] === 'token') {
                 $request->user()->tokens()->whereKey($record['key'])->delete();
+            } elseif ($record['kind'] === 'browser') {
+                $device = \App\Support\Auth\BrowserDevices::table()->where('user_id', $request->user()->getKey())->where('id', $record['key']);
+                $sessionId = $device->value('session_id');
+                $device->delete();
+                if ($sessionId && config('session.driver') === 'database') {
+                    Credentials::sessions()->where('user_id', $request->user()->getKey())->where('id', $sessionId)->delete();
+                }
             } else {
                 Credentials::sessions()->where('user_id', $request->user()->getKey())->where('id', $record['key'])->delete();
                 $request->user()->forceFill(['remember_token' => Str::random(60)])->save();
@@ -97,8 +117,12 @@ class SessionController extends Controller
         $data = $request->validate(['name' => ['required', 'string', 'max:255']]);
         $record = collect($this->records($request))->first(fn ($item) => hash_equals($item['data']['id'], $session));
         abort_unless($record, 404);
-        abort_unless($record['kind'] === 'token', 422, __('Only token devices can be renamed.'));
-        $request->user()->tokens()->whereKey($record['key'])->update(['name' => $data['name']]);
+        if ($record['kind'] === 'browser') {
+            \App\Support\Auth\BrowserDevices::table()->where('user_id', $request->user()->getKey())->where('id', $record['key'])->update(['name' => $data['name']]);
+        } else {
+            abort_unless($record['kind'] === 'token', 422, __('Legacy browser sessions cannot be renamed.'));
+            $request->user()->tokens()->whereKey($record['key'])->update(['name' => $data['name']]);
+        }
 
         return response()->noContent();
     }

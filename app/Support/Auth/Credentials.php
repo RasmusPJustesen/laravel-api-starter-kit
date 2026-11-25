@@ -26,6 +26,12 @@ final class Credentials
 
         $tokens->delete();
 
+        $devices = BrowserDevices::table()->where('user_id', $user->getKey());
+        if (! ($current instanceof PersonalAccessToken) && $request->hasSession()) {
+            $devices->where('id', '!=', $request->session()->get('browser_device_id', ''));
+        }
+        $devices->delete();
+
         if (config('session.driver') === 'database') {
             $sessions = self::sessions()->where('user_id', $user->getKey());
             if (! ($current instanceof PersonalAccessToken) && $request->hasSession()) {
@@ -40,6 +46,7 @@ final class Credentials
     public static function revokeAll(User $user): void
     {
         $user->tokens()->delete();
+        BrowserDevices::table()->where('user_id', $user->getKey())->delete();
         if (config('session.driver') === 'database') {
             self::sessions()->where('user_id', $user->getKey())->delete();
         }

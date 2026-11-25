@@ -20,6 +20,7 @@ class RefreshTokenController extends Controller
         $current = $user->currentAccessToken();
         abort_unless($current instanceof \Laravel\Sanctum\PersonalAccessToken, 403);
         $token = DB::transaction(function () use ($request, $user, $current): string {
+            \App\Models\User::query()->lockForUpdate()->findOrFail($user->getKey());
             $locked = $user->tokens()->lockForUpdate()->find($current->getKey());
             abort_unless($locked, 401);
             $name = $locked->name;

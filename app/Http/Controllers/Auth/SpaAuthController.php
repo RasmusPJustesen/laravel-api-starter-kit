@@ -27,8 +27,7 @@ class SpaAuthController extends Controller
             return response()->json(\App\Support\Auth\LoginChallenge::issue($user, $request, 'stateful'), 202);
         }
 
-        Auth::guard('web')->login($user, $request->boolean('remember'));
-        $request->session()->regenerate();
+        \App\Support\Auth\BrowserDevices::login($request, $user, $request->boolean('remember'), (string) $request->string('device_name', 'Browser'));
 
         return response()->noContent();
     }
@@ -37,8 +36,7 @@ class SpaAuthController extends Controller
     {
         $user = User::create($request->validated());
         event(new Registered($user));
-        Auth::guard('web')->login($user);
-        $request->session()->regenerate();
+        \App\Support\Auth\BrowserDevices::login($request, $user);
 
         return (new UserResource($user))->response()->setStatusCode(201);
     }

@@ -21,8 +21,7 @@ class TwoFactorChallengeController extends Controller
     public function session(Request $request)
     {
         return LoginChallenge::consume($request, 'stateful', function (User $user, object $challenge) use ($request) {
-            Auth::guard('web')->login($user, (bool) $challenge->remember);
-            $request->session()->regenerate();
+            \App\Support\Auth\BrowserDevices::login($request, $user, (bool) $challenge->remember, $challenge->device_name);
 
             return response()->noContent();
         });

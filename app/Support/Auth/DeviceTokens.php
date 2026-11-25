@@ -14,10 +14,14 @@ final class DeviceTokens
         $token = $user->createToken($name, $abilities);
         $token->accessToken->forceFill([
             'device_id' => $deviceId ?? (string) Str::uuid(),
-            'client_id' => $request->header('X-Client', config('frontends.default')),
+            'client_id' => substr((string) $request->header('X-Client', config('frontends.default')), 0, 255),
             'ip_address' => $request->ip(),
             'user_agent' => substr((string) $request->userAgent(), 0, 512),
         ])->save();
+
+        if ($deviceId === null && config('starter-kit.new_device_notifications')) {
+            SecurityEvents::dispatch($user, 'New device login');
+        }
 
         return $token;
     }

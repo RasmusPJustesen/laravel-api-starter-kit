@@ -17,8 +17,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // Middleware configuration runs before the config repository is loaded.
         // Sanctum's configured stateful domains decide whether to start a session.
         $middleware->statefulApi();
+        $middleware->api(append: [\App\Http\Middleware\RestoreBrowserDevice::class]);
         $middleware->api(append: [\App\Http\Middleware\ResolveLocale::class]);
         $middleware->web(append: [\App\Http\Middleware\ResolveLocale::class]);
+        $middleware->appendToPriorityList(\Illuminate\Session\Middleware\StartSession::class, \App\Http\Middleware\RestoreBrowserDevice::class);
+        $middleware->web(append: [\App\Http\Middleware\RestoreBrowserDevice::class]);
         $middleware->alias([
             'password.confirmed' => \App\Http\Middleware\RequirePasswordConfirmation::class,
             'verified' => \App\Http\Middleware\EnsureVerifiedEmail::class,

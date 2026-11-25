@@ -19,6 +19,7 @@ final class TwoFactor
         return hash('sha256', $user->getAuthPassword().'|'.$user->two_factor_secret.'|'.$user->two_factor_confirmed_at);
     }
 
+    /** @return list<string> */
     public static function generateRecoveryCodes(): array
     {
         return array_map(fn () => Str::random(10).'-'.Str::random(10), range(1, 8));

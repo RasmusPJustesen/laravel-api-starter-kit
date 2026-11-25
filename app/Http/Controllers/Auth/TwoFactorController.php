@@ -4,28 +4,33 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\Auth\Credentials;
+use App\Support\Auth\SecurityEvents;
 use App\Support\Auth\TwoFactor;
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Writer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
 
 class TwoFactorController extends Controller
 {
-    public function show(Request $request)
+    public function show(Request $request): \Illuminate\Http\JsonResponse
     {
         return response()->json(['enabled' => TwoFactor::enabled($request->user()), 'pending' => $request->user()->two_factor_secret !== null && ! TwoFactor::enabled($request->user())]);
     }
 
-    public function store(Request $request, TwoFactorAuthenticationProvider $provider)
+    public function store(Request $request): \Illuminate\Http\Response
     {
-        DB::transaction(function () use ($request, $provider): void {
-            $user = User::query()->lockForUpdate()->findOrFail($request->user()->getKey());
+        DB::transaction(function () use ($request): void {
+            $user = User::query()->lockForUpdate()->whereKey($request->user()->getKey())->firstOrFail();
             abort_if(TwoFactor::enabled($user), 409);
             $user->forceFill([
-                'two_factor_secret' => Crypt::encryptString($provider->generateSecretKey(32)),
+                'two_factor_secret' => Crypt::encryptString(app(\PragmaRX\Google2FA\Google2FA::class)->generateSecretKey(32)),
                 'two_factor_recovery_codes' => Crypt::encryptString(json_encode(TwoFactor::generateRecoveryCodes(), JSON_THROW_ON_ERROR)),
                 'two_factor_confirmed_at' => null,
                 'two_factor_last_step' => null,
@@ -35,7 +40,7 @@ class TwoFactorController extends Controller
         return response()->noContent();
     }
 
-    public function setup(Request $request, TwoFactorAuthenticationProvider $provider)
+    public function setup(Request $request, TwoFactorAuthenticationProvider $provider): \Illuminate\Http\JsonResponse
     {
         $user = $request->user();
         abort_unless($user->two_factor_secret && ! TwoFactor::enabled($user), 409);
@@ -47,26 +52,26 @@ class TwoFactorController extends Controller
         ])->header('Cache-Control', 'no-store');
     }
 
-    public function qrCode(Request $request, TwoFactorAuthenticationProvider $provider)
+    public function qrCode(Request $request, TwoFactorAuthenticationProvider $provider): \Illuminate\Http\JsonResponse
     {
         $user = $request->user();
         abort_unless($user->two_factor_secret && ! TwoFactor::enabled($user), 409);
         $url = $provider->qrCodeUrl(config('app.name'), $user->email, Crypt::decryptString($user->two_factor_secret));
 
-        $svg = (new \BaconQrCode\Writer(new \BaconQrCode\Renderer\ImageRenderer(
-            new \BaconQrCode\Renderer\RendererStyle\RendererStyle(192),
-            new \BaconQrCode\Renderer\Image\SvgImageBackEnd()
+        $svg = (new Writer(new ImageRenderer(
+            new RendererStyle(192),
+            new SvgImageBackEnd
         )))->writeString($url);
 
         return response()->json(['svg' => $svg, 'url' => $url])->header('Cache-Control', 'no-store');
     }
 
-    public function confirm(Request $request)
+    public function confirm(Request $request): \Illuminate\Http\Response
     {
         $data = $request->validate(['code' => ['required', 'string', 'regex:/^\d{6}$/D']]);
 
         DB::transaction(function () use ($request, $data): void {
-            $user = User::query()->lockForUpdate()->findOrFail($request->user()->getKey());
+            $user = User::query()->lockForUpdate()->whereKey($request->user()->getKey())->firstOrFail();
             abort_unless($user->two_factor_secret && ! TwoFactor::enabled($user), 409);
 
             if (! TwoFactor::verify($user, $data['code'])) {
@@ -74,14 +79,14 @@ class TwoFactorController extends Controller
             }
 
             $user->forceFill(['two_factor_confirmed_at' => now()])->save();
-            \App\Support\Auth\SecurityEvents::dispatch($user, 'Two-factor authentication enabled');
+            SecurityEvents::dispatch($user, 'Two-factor authentication enabled');
             $this->revokeOthers($request, $user);
         });
 
         return response()->noContent();
     }
 
-    public function recoveryCodes(Request $request)
+    public function recoveryCodes(Request $request): \Illuminate\Http\JsonResponse
     {
         $user = $request->user();
         abort_unless(TwoFactor::enabled($user), 409);
@@ -89,15 +94,15 @@ class TwoFactorController extends Controller
         return response()->json(['codes' => json_decode(Crypt::decryptString($user->two_factor_recovery_codes), true, 512, JSON_THROW_ON_ERROR)])->header('Cache-Control', 'no-store');
     }
 
-    public function regenerate(Request $request)
+    public function regenerate(Request $request): \Illuminate\Http\JsonResponse
     {
         $codes = DB::transaction(function () use ($request) {
-            $user = User::query()->lockForUpdate()->findOrFail($request->user()->getKey());
+            $user = User::query()->lockForUpdate()->whereKey($request->user()->getKey())->firstOrFail();
             $this->requireFactor($request, $user);
             $codes = TwoFactor::generateRecoveryCodes();
             $user->forceFill(['two_factor_recovery_codes' => Crypt::encryptString(json_encode($codes, JSON_THROW_ON_ERROR))])->save();
 
-            \App\Support\Auth\SecurityEvents::dispatch($user, 'Recovery codes regenerated');
+            SecurityEvents::dispatch($user, 'Recovery codes regenerated');
 
             return $codes;
         });
@@ -105,11 +110,11 @@ class TwoFactorController extends Controller
         return response()->json(['codes' => $codes])->header('Cache-Control', 'no-store');
     }
 
-    public function destroy(Request $request)
+    public function destroy(Request $request): \Illuminate\Http\Response
     {
         abort_if(config('starter-kit.require_two_factor'), 403, __('Two-factor authentication is required.'));
         DB::transaction(function () use ($request): void {
-            $user = User::query()->lockForUpdate()->findOrFail($request->user()->getKey());
+            $user = User::query()->lockForUpdate()->whereKey($request->user()->getKey())->firstOrFail();
 
             if (TwoFactor::enabled($user)) {
                 $this->requireFactor($request, $user);
@@ -121,7 +126,7 @@ class TwoFactorController extends Controller
                 'two_factor_confirmed_at' => null,
                 'two_factor_last_step' => null,
             ])->save();
-            \App\Support\Auth\SecurityEvents::dispatch($user, 'Two-factor authentication disabled');
+            SecurityEvents::dispatch($user, 'Two-factor authentication disabled');
             $this->revokeOthers($request, $user);
         });
 
@@ -142,6 +147,6 @@ class TwoFactorController extends Controller
 
     private function revokeOthers(Request $request, User $user): void
     {
-        \App\Support\Auth\Credentials::revokeOthers($request, $user);
+        Credentials::revokeOthers($request, $user);
     }
 }

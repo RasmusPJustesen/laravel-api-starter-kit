@@ -20,5 +20,5 @@ return [
     'account_deletion' => env('STARTER_KIT_ACCOUNT_DELETION', true),
     'challenge_lifetime' => (int) env('AUTH_CHALLENGE_LIFETIME', 300),
     'security_notifications' => env('AUTH_SECURITY_NOTIFICATIONS', true),
-    'locales' => array_values(array_filter(array_map('trim', explode(',', env('API_LOCALES', 'en'))))),
+    'locales' => array_values(array_filter(array_map('trim', explode(',', (string) env('API_LOCALES', 'en'))))),
 ];

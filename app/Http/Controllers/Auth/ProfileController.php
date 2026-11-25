@@ -6,11 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\DeleteUserRequest;
 use App\Http\Requests\Auth\ProfileUpdateRequest;
 use App\Http\Resources\UserResource;
+use App\Support\Auth\Credentials;
+use App\Support\Auth\PasswordConfirmation;
+use App\Support\Auth\SecurityEvents;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 #[Group('Profile')]
@@ -35,14 +39,14 @@ class ProfileController extends Controller
             return new UserResource($user);
         }
 
-        if (! \App\Support\Auth\PasswordConfirmation::confirmed($request)) {
+        if (! PasswordConfirmation::confirmed($request)) {
             abort(403, __('Please confirm your password.'), ['X-API-Error-Code' => 'PASSWORD_CONFIRMATION_REQUIRED']);
         }
 
         $user->email_verified_at = null;
         $user->save();
         $user->sendEmailVerificationNotification();
-        \App\Support\Auth\SecurityEvents::dispatch($user, 'Email changed', $previousEmail);
+        SecurityEvents::dispatch($user, 'Email changed', $previousEmail);
 
         return new UserResource($user);
     }
@@ -53,12 +57,12 @@ class ProfileController extends Controller
         $user = $request->user();
 
         DB::transaction(function () use ($user): void {
-            \App\Support\Auth\Credentials::revokeAll($user);
+            Credentials::revokeAll($user);
             $user->delete();
         });
 
         if ($request->hasSession()) {
-            \Illuminate\Support\Facades\Auth::guard('web')->logout();
+            Auth::guard('web')->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
         }

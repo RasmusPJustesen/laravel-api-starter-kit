@@ -5,9 +5,13 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\User;
+use App\Support\Auth\DeviceTokens;
+use App\Support\Auth\LoginChallenge;
+use App\Support\Auth\TwoFactor;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -19,33 +23,33 @@ class LoginController extends Controller
     #[Endpoint(title: 'Login', description: 'Authenticate a user and return an API token.')]
     public function __invoke(LoginRequest $request): JsonResponse
     {
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($request): JsonResponse {
-        $user = User::query()->lockForUpdate()
-            ->where('email', (string) $request->string('email'))
-            ->first();
-        $password = (string) $request->string('password');
+        return DB::transaction(function () use ($request): JsonResponse {
+            $user = User::query()->lockForUpdate()
+                ->where('email', (string) $request->string('email'))
+                ->first();
+            $password = (string) $request->string('password');
 
-        if (! $user) {
-            Hash::check($password, self::DUMMY_PASSWORD_HASH);
+            if (! $user) {
+                Hash::check($password, self::DUMMY_PASSWORD_HASH);
 
-            throw ValidationException::withMessages([
-                'email' => [__('auth.failed')],
-            ]);
-        }
+                throw ValidationException::withMessages([
+                    'email' => [__('auth.failed')],
+                ]);
+            }
 
-        if (! Hash::check($password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => [__('auth.failed')],
-            ]);
-        }
+            if (! Hash::check($password, $user->password)) {
+                throw ValidationException::withMessages([
+                    'email' => [__('auth.failed')],
+                ]);
+            }
 
-        if (\App\Support\Auth\TwoFactor::enabled($user)) {
-            return response()->json(\App\Support\Auth\LoginChallenge::issue($user, $request, 'stateless'), 202);
-        }
+            if (TwoFactor::enabled($user)) {
+                return response()->json(LoginChallenge::issue($user, $request, 'stateless'), 202);
+            }
 
-        $token = \App\Support\Auth\DeviceTokens::issue($user, $request, (string) $request->string('device_name', 'auth'))->plainTextToken;
+            $token = DeviceTokens::issue($user, $request, (string) $request->string('device_name', 'auth'))->plainTextToken;
 
-        return response()->json(['token' => $token]);
+            return response()->json(['token' => $token]);
         });
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Support\FrontendClients;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -16,6 +17,7 @@ class InstallStarterKit extends Command
     {
         if ($this->option('teams') && $this->option('no-teams')) {
             $this->error('Choose either --teams or --no-teams.');
+
             return self::FAILURE;
         }
 
@@ -24,11 +26,13 @@ class InstallStarterKit extends Command
 
         if (! in_array($auth, ['both', 'stateless', 'stateful'], true)) {
             $this->error('Invalid authentication mode.');
+
             return self::FAILURE;
         }
 
         if (File::exists(base_path('.starter-kit-installed'))) {
             $this->error('The starter kit is already configured. Do not overwrite generated application files.');
+
             return self::FAILURE;
         }
 
@@ -50,6 +54,7 @@ class InstallStarterKit extends Command
                 app(TeamScaffolder::class)->install($name, $plural, $personal);
             } catch (\InvalidArgumentException $exception) {
                 $this->error($exception->getMessage());
+
                 return self::FAILURE;
             }
         }
@@ -80,6 +85,7 @@ class InstallStarterKit extends Command
         return self::SUCCESS;
     }
 
+    /** @return array<string, mixed>|null */
     private function frontendConfiguration(bool $interactive, string $auth): ?array
     {
         $definitions = [];
@@ -92,7 +98,7 @@ class InstallStarterKit extends Command
                 $id = $this->ask('Frontend identifier', $definitions === [] ? 'web' : 'mobile');
                 $url = $this->ask('Frontend URL (HTTPS recommended)', 'http://localhost:3000');
                 $mode = $auth === 'both' ? $this->choice('Client authentication', ['stateful', 'stateless'], 'stateful') : $auth;
-                $origin = $this->ask('Browser origin, if any (leave blank for none)', $mode === 'stateful' ? \App\Support\FrontendClients::origin($url) : null);
+                $origin = $this->ask('Browser origin, if any (leave blank for none)', $mode === 'stateful' ? FrontendClients::origin($url) : null);
                 $definitions[] = ['id' => $id, 'url' => $url, 'authentication' => $mode, 'origin' => $origin];
             } while ($this->confirm('Configure another frontend?', false));
         }
@@ -113,12 +119,12 @@ class InstallStarterKit extends Command
             $id = $definition['id'] ?? '';
             $url = $definition['url'] ?? '';
             $mode = $definition['authentication'] ?? ($auth === 'both' ? 'stateful' : $auth);
-            $origin = $definition['origin'] ?? ($mode === 'stateful' ? \App\Support\FrontendClients::origin($url) : null);
+            $origin = $definition['origin'] ?? ($mode === 'stateful' ? FrontendClients::origin($url) : null);
             if (! is_string($id) || ! preg_match('/^[a-z][a-z0-9_-]{0,39}$/D', $id) || isset($clients[$id]) ||
-                ! is_string($url) || ! \App\Support\FrontendClients::origin($url) ||
+                ! is_string($url) || ! FrontendClients::origin($url) ||
                 parse_url($url, PHP_URL_QUERY) !== null || parse_url($url, PHP_URL_FRAGMENT) !== null ||
                 ! in_array($mode, ['stateful', 'stateless'], true) || ($auth !== 'both' && $mode !== $auth) ||
-                ($origin !== null && (! is_string($origin) || \App\Support\FrontendClients::origin($origin) !== $origin))) {
+                ($origin !== null && (! is_string($origin) || FrontendClients::origin($origin) !== $origin))) {
                 throw new \InvalidArgumentException('Invalid or duplicate frontend definition.');
             }
             $clients[$id] = [

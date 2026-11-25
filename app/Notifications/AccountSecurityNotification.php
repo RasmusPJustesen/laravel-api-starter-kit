@@ -9,6 +9,7 @@ class AccountSecurityNotification extends Notification
 {
     public function __construct(private string $action) {}
 
+    /** @return list<string> */
     public function via(object $notifiable): array
     {
         return ['mail'];

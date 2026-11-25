@@ -209,10 +209,10 @@ jobs:
           test ! -d .git
           test -f .starter-kit-installed
           php artisan migrate:status
-          php artisan tinker --execute='App\\Models\\User::factory()->create(["email" => "existing@example.test"]);'
+          php artisan tinker --execute='App\Models\User::factory()->create(["email" => "existing@example.test"]);'
           php artisan starter-kit:teams --team-name=workspace --team-plural=collectives --personal-teams --no-interaction
           composer dump-autoload
           php artisan optimize:clear
           php artisan migrate --force
-          php artisan tinker --execute='if (! App\\Models\\User::where("email", "existing@example.test")->firstOrFail()->personalWorkspace()) { throw new RuntimeException("Personal workspace not provisioned"); }'
+          php artisan tinker --execute='if (! App\Models\User::where("email", "existing@example.test")->firstOrFail()->personalWorkspace()) { throw new RuntimeException("Personal workspace not provisioned"); }'
           php artisan test

@@ -22,8 +22,6 @@ class VerifyEmailController extends Controller
 
         abort_if($user === null, Response::HTTP_FORBIDDEN);
 
-        abort_if(! $user instanceof MustVerifyEmail, Response::HTTP_FORBIDDEN);
-
         /** @var MustVerifyEmail $verifiedUser */
         $verifiedUser = $user;
 

@@ -21,7 +21,10 @@ use Illuminate\Support\Facades\Route;
 
 final class ApiContract
 {
-    /** @param array<string, Type> $properties */
+    /**
+     * @param array<string, Type> $properties
+     * @param list<string>|null $required
+     */
     private static function object(array $properties, ?array $required = null): ObjectType
     {
         $type = new ObjectType;
@@ -153,6 +156,7 @@ final class ApiContract
                 foreach ($statuses as $status) {
                     $operation->responses = array_values(array_filter($operation->responses ?? [], function ($response) use ($status): bool {
                         $resolved = $response instanceof Reference ? $response->resolve() : $response;
+
                         return (int) ($resolved->code ?? 0) !== $status;
                     }));
                     $response = Response::make($status)->setDescription($errors[$status] ?? 'Request failed')->setContent('application/json', $error);

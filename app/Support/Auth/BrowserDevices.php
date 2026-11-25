@@ -3,6 +3,7 @@
 namespace App\Support\Auth;
 
 use App\Models\User;
+use App\Support\FrontendClients;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
@@ -13,7 +14,7 @@ final class BrowserDevices
 {
     public const COOKIE = 'starter_device';
 
-    public static function table()
+    public static function table(): \Illuminate\Database\Query\Builder
     {
         return DB::table('browser_devices');
     }
@@ -35,7 +36,7 @@ final class BrowserDevices
             'remember_hash' => $secret ? hash('sha256', $secret) : null,
             'remember_until' => $secret ? now()->addMinutes($minutes) : null,
             'name' => $name,
-            'client_id' => \App\Support\FrontendClients::resolve($request)['id'],
+            'client_id' => FrontendClients::resolve($request)['id'],
             'ip_address' => $request->ip(),
             'user_agent' => substr((string) $request->userAgent(), 0, 512),
             'last_active_at' => now(),
@@ -61,12 +62,14 @@ final class BrowserDevices
             $device = self::table()->where('id', $id)->first();
             if ($device && (string) $guard->id() === (string) $device->user_id && $device->session_id === $request->session()->getId()) {
                 self::table()->where('id', $id)->update(['last_active_at' => now()]);
+
                 return;
             }
             $guard->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
             Cookie::queue(Cookie::forget(self::COOKIE));
+
             return;
         }
 
@@ -85,10 +88,11 @@ final class BrowserDevices
 
         DB::transaction(function () use ($request, $id, $secret, $guard): void {
             $candidate = self::table()->where('id', $id)->first();
-            $user = $candidate ? User::query()->lockForUpdate()->find($candidate->user_id) : null;
+            $user = $candidate ? User::query()->lockForUpdate()->whereKey($candidate->user_id)->first() : null;
             $device = self::table()->where('id', $id)->lockForUpdate()->first();
             if (! $user || ! $device || ! $device->remember_hash || ! hash_equals($device->remember_hash, hash('sha256', $secret)) || now()->gte($device->remember_until)) {
                 Cookie::queue(Cookie::forget(self::COOKIE));
+
                 return;
             }
             $guard->login($user, false);
@@ -113,7 +117,7 @@ final class BrowserDevices
         Cookie::queue(Cookie::forget(self::COOKIE));
     }
 
-    public static function active($query)
+    public static function active(\Illuminate\Database\Query\Builder $query): \Illuminate\Database\Query\Builder
     {
         return $query->where(function ($query): void {
             $query->where('last_active_at', '>', now()->subMinutes(config('session.lifetime')))

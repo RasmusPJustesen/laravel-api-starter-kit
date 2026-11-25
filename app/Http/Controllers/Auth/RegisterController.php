@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Support\Auth\DeviceTokens;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Auth\Events\Registered;
@@ -22,7 +23,7 @@ class RegisterController extends Controller
         [$user, $token] = DB::transaction(function () use ($request): array {
             $user = User::create($request->validated());
 
-            return [$user, \App\Support\Auth\DeviceTokens::issue($user, $request, (string) $request->string('device_name', 'auth'))->plainTextToken];
+            return [$user, DeviceTokens::issue($user, $request, (string) $request->string('device_name', 'auth'))->plainTextToken];
         });
 
         event(new Registered($user));

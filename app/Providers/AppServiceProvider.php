@@ -2,14 +2,28 @@
 
 namespace App\Providers;
 
+use App\Events\AccountSecurityChanged;
+use App\Notifications\AccountSecurityNotification;
+use App\Support\Auth\SecurityEvents;
 use App\Support\FrontendClients;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\DevCommands;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Fortify\Fortify;
+use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -18,7 +32,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        \Laravel\Fortify\Fortify::ignoreRoutes();
+        Fortify::ignoreRoutes();
     }
 
     /**
@@ -29,16 +43,16 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
         FrontendClients::configureOrigins();
 
-        \Laravel\Sanctum\Sanctum::authenticateAccessTokensUsing(
+        Sanctum::authenticateAccessTokensUsing(
             fn ($token, bool $valid): bool => $valid && config('starter-kit.authentication') !== 'stateful'
         );
         foreach (config('starter-kit.rate_limits') as $name => $attempts) {
-            \Illuminate\Support\Facades\RateLimiter::for('starter-'.$name, function (\Illuminate\Http\Request $request) use ($name, $attempts) {
-                $limits = [\Illuminate\Cache\RateLimiting\Limit::perMinute(max(1, $attempts))->by('ip:'.$request->ip())];
+            RateLimiter::for('starter-'.$name, function (Request $request) use ($name, $attempts) {
+                $limits = [Limit::perMinute(max(1, $attempts))->by('ip:'.$request->ip())];
                 if ($name === 'authentication') {
                     $key = $request->input('challenge_token') ?: $request->input('email', '');
                     if (is_string($key) && $key !== '') {
-                        $limits[] = \Illuminate\Cache\RateLimiting\Limit::perMinute(max(1, $attempts))->by('credential:'.hash('sha256', strtolower($key)));
+                        $limits[] = Limit::perMinute(max(1, $attempts))->by('credential:'.hash('sha256', strtolower($key)));
                     }
                 }
 
@@ -46,20 +60,20 @@ class AppServiceProvider extends ServiceProvider
             });
         }
 
-        \Illuminate\Support\Facades\Event::listen(\App\Events\AccountSecurityChanged::class, function (\App\Events\AccountSecurityChanged $event): void {
-            \Illuminate\Support\Facades\Log::info('account.security.changed', ['user_id' => $event->user->getKey(), 'action' => $event->action]);
+        Event::listen(AccountSecurityChanged::class, function (AccountSecurityChanged $event): void {
+            Log::info('account.security.changed', ['user_id' => $event->user->getKey(), 'action' => $event->action]);
             if (config('starter-kit.security_notifications')) {
                 try {
-                    \Illuminate\Support\Facades\Notification::route('mail', $event->recipient ?? $event->user->email)
-                        ->notify(new \App\Notifications\AccountSecurityNotification($event->action));
+                    Notification::route('mail', $event->recipient ?? $event->user->email)
+                        ->notify(new AccountSecurityNotification($event->action));
                 } catch (\Throwable $exception) {
                     report($exception);
                 }
             }
         });
 
-        \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\PasswordReset::class, function ($event): void {
-            \App\Support\Auth\SecurityEvents::dispatch($event->user, 'Password reset');
+        Event::listen(PasswordReset::class, function ($event): void {
+            SecurityEvents::dispatch($event->user, 'Password reset');
         });
 
         ResetPassword::createUrlUsing(function ($user, string $token): string {
@@ -69,8 +83,8 @@ class AppServiceProvider extends ServiceProvider
             ]);
         });
 
-        \Illuminate\Auth\Notifications\VerifyEmail::createUrlUsing(function ($user): string {
-            $signed = \Illuminate\Support\Facades\URL::temporarySignedRoute(
+        VerifyEmail::createUrlUsing(function ($user): string {
+            $signed = URL::temporarySignedRoute(
                 'verification.verify',
                 now()->addMinutes(config('auth.verification.expire', 60)),
                 ['id' => $user->getKey(), 'hash' => sha1($user->getEmailForVerification())],

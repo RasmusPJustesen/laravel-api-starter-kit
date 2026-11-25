@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\App;
 
 class ResolveLocale
 {
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): \Symfony\Component\HttpFoundation\Response
     {
         $previous = App::currentLocale();
         App::setLocale($request->getPreferredLanguage(config('starter-kit.locales', ['en'])) ?: config('app.locale'));

@@ -3,8 +3,12 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use App\Support\Auth\BrowserDevices;
 use App\Support\Auth\Credentials;
+use App\Support\Auth\UserAgent;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -16,9 +20,11 @@ class SessionController extends Controller
         return $type.':'.hash_hmac('sha256', $id, config('app.key'));
     }
 
+    /** @return list<array{key: int|string, kind: string, device_id?: string|null, data: array<string, mixed>}> */
     private function records(Request $request): array
     {
         $user = $request->user();
+        /** @var PersonalAccessToken|\Laravel\Sanctum\TransientToken|null $3 */
         $current = $user->currentAccessToken();
         $items = [];
         $tokens = $user->tokens()->get();
@@ -41,7 +47,7 @@ class SessionController extends Controller
             ]];
         }
 
-        foreach (\App\Support\Auth\BrowserDevices::active(\App\Support\Auth\BrowserDevices::table()->where('user_id', $user->getKey()))->get() as $device) {
+        foreach (BrowserDevices::active(BrowserDevices::table()->where('user_id', $user->getKey()))->get() as $device) {
             $items[] = ['key' => $device->id, 'kind' => 'browser', 'data' => [
                 'id' => $this->opaque('browser', $device->id),
                 'name' => $device->name,
@@ -49,14 +55,14 @@ class SessionController extends Controller
                 'client_id' => $device->client_id,
                 'ip_address' => $device->ip_address,
                 'user_agent' => $device->user_agent,
-                'last_active_at' => \Illuminate\Support\Carbon::parse($device->last_active_at)->toISOString(),
+                'last_active_at' => Carbon::parse($device->last_active_at)->toISOString(),
                 'is_current' => ! ($current instanceof PersonalAccessToken) && $request->hasSession() && $request->session()->get('browser_device_id') === $device->id,
             ]];
         }
 
         if (config('session.driver') === 'database') {
             $sessions = Credentials::sessions()->where('user_id', $user->getKey())
-                ->whereNotIn('id', \App\Support\Auth\BrowserDevices::table()->whereNotNull('session_id')->select('session_id'))->where('last_activity', '>', now()->subMinutes(config('session.lifetime'))->timestamp)->get();
+                ->whereNotIn('id', BrowserDevices::table()->whereNotNull('session_id')->select('session_id'))->where('last_activity', '>', now()->subMinutes(config('session.lifetime'))->timestamp)->get();
 
             foreach ($sessions as $session) {
                 $items[] = ['key' => $session->id, 'kind' => 'session', 'data' => [
@@ -66,7 +72,7 @@ class SessionController extends Controller
                     'client_id' => null,
                     'ip_address' => $session->ip_address,
                     'user_agent' => $session->user_agent,
-                    'last_active_at' => \Illuminate\Support\Carbon::createFromTimestamp($session->last_activity)->toISOString(),
+                    'last_active_at' => Carbon::createFromTimestamp($session->last_activity)->toISOString(),
                     'is_current' => ! ($current instanceof PersonalAccessToken) && $request->hasSession() && $request->session()->getId() === $session->id,
                 ]];
             }
@@ -75,29 +81,29 @@ class SessionController extends Controller
         return $items;
     }
 
-    public function index(Request $request)
+    public function index(Request $request): \Illuminate\Http\JsonResponse
     {
-        return response()->json(['data' => array_map(fn ($item) => ['type' => 'sessions', 'id' => $item['data']['id'], 'attributes' => array_diff_key($item['data'], ['id' => true]) + \App\Support\Auth\UserAgent::describe($item['data']['user_agent'])], $this->records($request))]);
+        return response()->json(['data' => array_map(fn ($item) => ['type' => 'sessions', 'id' => $item['data']['id'], 'attributes' => array_diff_key($item['data'], ['id' => true]) + UserAgent::describe($item['data']['user_agent'])], $this->records($request))]);
     }
 
-    public function destroy(Request $request, string $session)
+    public function destroy(Request $request, string $session): \Illuminate\Http\Response
     {
         $record = collect($this->records($request))->first(fn ($item) => hash_equals($item['data']['id'], $session));
-        abort_unless($record, 404);
+        abort_unless($record !== null, 404);
         abort_if($record['data']['is_current'], 409, __('Use logout to end the current session.'));
 
         DB::transaction(function () use ($request, $record): void {
-            $user = \App\Models\User::query()->lockForUpdate()->findOrFail($request->user()->getKey());
+            $user = User::query()->lockForUpdate()->whereKey($request->user()->getKey())->firstOrFail();
             if ($record['kind'] === 'token') {
                 $query = $user->tokens();
-                if ($record['device_id']) {
+                if (! empty($record['device_id'])) {
                     $query->where('device_id', $record['device_id']);
                 } else {
                     $query->whereKey($record['key']);
                 }
                 $query->delete();
             } elseif ($record['kind'] === 'browser') {
-                $device = \App\Support\Auth\BrowserDevices::table()->where('user_id', $request->user()->getKey())->where('id', $record['key']);
+                $device = BrowserDevices::table()->where('user_id', $request->user()->getKey())->where('id', $record['key']);
                 $sessionId = $device->value('session_id');
                 $device->delete();
                 if ($sessionId && config('session.driver') === 'database') {
@@ -112,27 +118,27 @@ class SessionController extends Controller
         return response()->noContent();
     }
 
-    public function others(Request $request)
+    public function others(Request $request): \Illuminate\Http\Response
     {
         DB::transaction(function () use ($request): void {
-            $user = \App\Models\User::query()->lockForUpdate()->findOrFail($request->user()->getKey());
+            $user = User::query()->lockForUpdate()->whereKey($request->user()->getKey())->firstOrFail();
             Credentials::revokeOthers($request, $user);
         });
 
         return response()->noContent();
     }
 
-    public function update(Request $request, string $session)
+    public function update(Request $request, string $session): \Illuminate\Http\Response
     {
         $data = $request->validate(['name' => ['required', 'string', 'max:255']]);
         $record = collect($this->records($request))->first(fn ($item) => hash_equals($item['data']['id'], $session));
-        abort_unless($record, 404);
+        abort_unless($record !== null, 404);
         if ($record['kind'] === 'browser') {
-            \App\Support\Auth\BrowserDevices::table()->where('user_id', $request->user()->getKey())->where('id', $record['key'])->update(['name' => $data['name']]);
+            BrowserDevices::table()->where('user_id', $request->user()->getKey())->where('id', $record['key'])->update(['name' => $data['name']]);
         } else {
             abort_unless($record['kind'] === 'token', 422, __('Legacy browser sessions cannot be renamed.'));
             $query = $request->user()->tokens();
-            if ($record['device_id']) {
+            if (! empty($record['device_id'])) {
                 $query->where('device_id', $record['device_id']);
             } else {
                 $query->whereKey($record['key']);

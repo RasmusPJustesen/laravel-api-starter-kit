@@ -16,6 +16,7 @@ class InstallTeams extends Command
     {
         if (! File::exists(base_path('.starter-kit-installed'))) {
             $this->error('Run starter-kit:install first.');
+
             return self::FAILURE;
         }
 

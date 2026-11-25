@@ -10,6 +10,7 @@ use Illuminate\Validation\ValidationException;
 
 final class LoginChallenge
 {
+    /** @return array{two_factor_required: true, challenge_token: string} */
     public static function issue(User $user, Request $request, string $mode): array
     {
         $plain = Str::random(64);
@@ -37,7 +38,7 @@ final class LoginChallenge
         return DB::transaction(function () use ($data, $mode, $authenticate) {
             $id = hash('sha256', $data['challenge_token']);
             $candidate = DB::table('authentication_challenges')->where('id', $id)->first();
-            $user = $candidate ? User::query()->lockForUpdate()->find($candidate->user_id) : null;
+            $user = $candidate ? User::query()->lockForUpdate()->whereKey($candidate->user_id)->first() : null;
             $challenge = DB::table('authentication_challenges')->where('id', $id)->lockForUpdate()->first();
 
             if (! $challenge || ! $user || $challenge->mode !== $mode ||

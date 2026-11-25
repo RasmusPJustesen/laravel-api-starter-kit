@@ -1,8 +1,16 @@
 <?php
 
+use App\Http\Middleware\EnsureVerifiedEmail;
+use App\Http\Middleware\RequirePasswordConfirmation;
+use App\Http\Middleware\RequireTwoFactor;
+use App\Http\Middleware\ResolveLocale;
+use App\Http\Middleware\RestoreBrowserDevice;
+use App\Support\ApiErrors;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Session\Middleware\StartSession;
+use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -17,19 +25,19 @@ return Application::configure(basePath: dirname(__DIR__))
         // Middleware configuration runs before the config repository is loaded.
         // Sanctum's configured stateful domains decide whether to start a session.
         $middleware->statefulApi();
-        $middleware->api(append: [\App\Http\Middleware\RestoreBrowserDevice::class]);
-        $middleware->api(append: [\App\Http\Middleware\ResolveLocale::class]);
-        $middleware->web(append: [\App\Http\Middleware\ResolveLocale::class]);
-        $middleware->appendToPriorityList(\Illuminate\Session\Middleware\StartSession::class, \App\Http\Middleware\RestoreBrowserDevice::class);
-        $middleware->web(append: [\App\Http\Middleware\RestoreBrowserDevice::class]);
+        $middleware->api(append: [RestoreBrowserDevice::class]);
+        $middleware->api(append: [ResolveLocale::class]);
+        $middleware->web(append: [ResolveLocale::class]);
+        $middleware->appendToPriorityList(StartSession::class, RestoreBrowserDevice::class);
+        $middleware->web(append: [RestoreBrowserDevice::class]);
         $middleware->alias([
-            'password.confirmed' => \App\Http\Middleware\RequirePasswordConfirmation::class,
-            'verified' => \App\Http\Middleware\EnsureVerifiedEmail::class,
-            'two-factor.required' => \App\Http\Middleware\RequireTwoFactor::class,
+            'password.confirmed' => RequirePasswordConfirmation::class,
+            'verified' => EnsureVerifiedEmail::class,
+            'two-factor.required' => RequireTwoFactor::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->respond(fn (\Symfony\Component\HttpFoundation\Response $response, \Throwable $exception) => \App\Support\ApiErrors::render($exception, $response));
+        $exceptions->respond(fn (Response $response, Throwable $exception) => ApiErrors::render($exception, $response));
     })
     ->prefersJsonResponses()
     ->create();

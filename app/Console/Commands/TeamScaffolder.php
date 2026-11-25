@@ -66,7 +66,7 @@ final class TeamScaffolder
         $providerPath = app_path('Providers/AppServiceProvider.php');
         $provider = File::get($providerPath);
         $marker = '$this->configureDefaults();';
-        $injection = $marker."\n        \\Illuminate\\Support\\Facades\\Event::listen(\\Illuminate\\Auth\\Events\\Registered::class, function (\\Illuminate\\Auth\\Events\\Registered \$event): void {\n            if (config('".$plural.".personal') && ! \$event->user->personal".$model."()) {\n                app(\\App\\Actions\\".$models."\\Create".$model."::class)->handle(\$event->user, \$event->user->name.\"'s ".$model."\", isPersonal: true);\n            }\n        });";
+        $injection = $marker."\n        \\Illuminate\\Support\\Facades\\Event::listen(\\Illuminate\\Auth\\Events\\Registered::class, function (\\Illuminate\\Auth\\Events\\Registered \$event): void {\n            if (config('".$plural.".personal') && ! \$event->user->personal".$model."()) {\n                app(\\App\\Actions\\".$models.'\\Create'.$model."::class)->handle(\$event->user, \$event->user->name.\"'s ".$model."\", isPersonal: true);\n            }\n        });";
         $newProvider = str_replace($marker, $injection, $provider, $count);
         if ($count !== 1) {
             throw new InvalidArgumentException('Application provider has been modified.');

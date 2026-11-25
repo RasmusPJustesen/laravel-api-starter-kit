@@ -21,6 +21,7 @@ final class FrontendClients
         return $parts['scheme'].'://'.$parts['host'].(isset($parts['port']) ? ':'.$parts['port'] : '');
     }
 
+    /** @return array<string, mixed> */
     public static function configured(?string $name = null): array
     {
         $clients = config('frontends.clients', []);
@@ -37,11 +38,16 @@ final class FrontendClients
         return ['id' => $name] + $client;
     }
 
+    /** @return array<string, mixed> */
     public static function resolve(Request $request): array
     {
         return self::configured($request->header('X-Client'));
     }
 
+    /**
+     * @param array<string, mixed> $client
+     * @param array<string, mixed> $parameters
+     */
     public static function link(array $client, string $pathKey, array $parameters = []): string
     {
         $path = $client[$pathKey] ?? null;
@@ -50,6 +56,7 @@ final class FrontendClients
         return rtrim($client['url'], '/').'/'.ltrim($path, '/').($parameters ? '?'.Arr::query($parameters) : '');
     }
 
+    /** @param array<string, mixed> $parameters */
     public static function url(Request $request, string $pathKey, array $parameters = []): string
     {
         return self::link(self::resolve($request), $pathKey, $parameters);

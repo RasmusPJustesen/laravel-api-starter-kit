@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 
 class RestoreBrowserDevice
 {
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): \Symfony\Component\HttpFoundation\Response
     {
         BrowserDevices::restore($request);
 

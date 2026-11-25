@@ -22,13 +22,13 @@ class FrontendNotificationTest extends TestCase
         ]);
         $user = User::factory()->unverified()->create();
         $this->withHeader('X-Client', 'mobile')->postJson('/forgot-password', ['email' => $user->email])->assertOk();
-        Notification::assertSentTo($user, ResetPassword::class, fn ($notification) =>
-            str_starts_with($notification->toMail($user)->actionUrl, 'https://links.example.test/reset-password?')
+        Notification::assertSentTo($user, ResetPassword::class, fn ($notification) => str_starts_with($notification->toMail($user)->actionUrl, 'https://links.example.test/reset-password?')
         );
         $this->withToken($user->createToken('device')->plainTextToken)->postJson('/email/verification-notification')->assertAccepted();
         $url = null;
         Notification::assertSentTo($user, VerifyEmail::class, function ($notification) use ($user, &$url): bool {
             $url = $notification->toMail($user)->actionUrl;
+
             return str_starts_with($url, 'https://links.example.test/verify-email?');
         });
         parse_str(parse_url($url, PHP_URL_QUERY), $query);
@@ -41,8 +41,7 @@ class FrontendNotificationTest extends TestCase
         Notification::fake();
         $user = User::factory()->create();
         $this->withHeader('X-Client', 'https://untrusted.example.test')->postJson('/forgot-password', ['email' => $user->email])->assertOk();
-        Notification::assertSentTo($user, ResetPassword::class, fn ($notification) =>
-            str_starts_with($notification->toMail($user)->actionUrl, config('frontends.clients.web.url').'/reset-password?')
+        Notification::assertSentTo($user, ResetPassword::class, fn ($notification) => str_starts_with($notification->toMail($user)->actionUrl, config('frontends.clients.web.url').'/reset-password?')
         );
     }
 }

@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 
 class PasswordConfirmationController extends Controller
 {
-    public function store(Request $request)
+    public function store(Request $request): \Illuminate\Http\Response
     {
         $data = $request->validate(['password' => ['required', 'string']]);
 
@@ -23,7 +23,7 @@ class PasswordConfirmationController extends Controller
         return response()->noContent();
     }
 
-    public function show(Request $request)
+    public function show(Request $request): \Illuminate\Http\JsonResponse
     {
         return response()->json(['confirmed' => PasswordConfirmation::confirmed($request)]);
     }

@@ -7,7 +7,10 @@ use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Http\Responses\MessageResponse;
 use App\Models\User;
+use App\Support\Auth\Credentials;
 use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -24,21 +27,21 @@ class PasswordResetController extends Controller
 
     public function update(ResetPasswordRequest $request): MessageResponse
     {
-        $lock = \Illuminate\Support\Facades\Cache::lock('password-reset:'.hash('sha256', strtolower($request->validated('email'))), 30);
+        $lock = Cache::lock('password-reset:'.hash('sha256', strtolower($request->validated('email'))), 30);
         try {
             $status = $lock->block(5, fn () => Password::reset($request->validated(), function (User $user, string $password): void {
-            DB::transaction(function () use ($user, $password): void {
-                $user = User::query()->lockForUpdate()->findOrFail($user->getKey());
-                $user->forceFill([
-                    'password' => $password,
-                    'remember_token' => Str::random(60),
-                ])->save();
-                \App\Support\Auth\Credentials::revokeAll($user);
-            });
+                DB::transaction(function () use ($user, $password): void {
+                    $user = User::query()->lockForUpdate()->whereKey($user->getKey())->firstOrFail();
+                    $user->forceFill([
+                        'password' => $password,
+                        'remember_token' => Str::random(60),
+                    ])->save();
+                    Credentials::revokeAll($user);
+                });
 
-            event(new PasswordReset($user));
+                event(new PasswordReset($user));
             }));
-        } catch (\Illuminate\Contracts\Cache\LockTimeoutException) {
+        } catch (LockTimeoutException) {
             abort(429, __('Please try again.'));
         }
 

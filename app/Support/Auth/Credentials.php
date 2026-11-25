@@ -10,13 +10,14 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 final class Credentials
 {
-    public static function sessions()
+    public static function sessions(): \Illuminate\Database\Query\Builder
     {
         return DB::connection(config('session.connection'))->table(config('session.table', 'sessions'));
     }
 
     public static function revokeOthers(Request $request, User $user): void
     {
+        /** @var PersonalAccessToken|\Laravel\Sanctum\TransientToken|null $3 */
         $current = $request->user()->currentAccessToken();
         $tokens = $user->tokens();
 

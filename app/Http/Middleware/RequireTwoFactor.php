@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 
 class RequireTwoFactor
 {
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): \Symfony\Component\HttpFoundation\Response
     {
         if (! config('starter-kit.require_two_factor') || TwoFactor::enabled($request->user())) {
             return $next($request);

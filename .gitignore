@@ -18,3 +18,9 @@ Homestead.yaml
 /.zed
 
 # Generated configuration manifests are tracked in application repositories.
+
+/node_modules
+/database/*.sqlite
+/database/*.sqlite-*
+/generated/openapi.json
+/generated/api.d.ts

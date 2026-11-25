@@ -28,6 +28,22 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
 
+        \Illuminate\Support\Facades\Event::listen(\App\Events\AccountSecurityChanged::class, function (\App\Events\AccountSecurityChanged $event): void {
+            \Illuminate\Support\Facades\Log::info('account.security.changed', ['user_id' => $event->user->getKey(), 'action' => $event->action]);
+            if (config('starter-kit.security_notifications')) {
+                try {
+                    \Illuminate\Support\Facades\Notification::route('mail', $event->recipient ?? $event->user->email)
+                        ->notify(new \App\Notifications\AccountSecurityNotification($event->action));
+                } catch (\Throwable $exception) {
+                    report($exception);
+                }
+            }
+        });
+
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\PasswordReset::class, function ($event): void {
+            \App\Support\Auth\SecurityEvents::dispatch($event->user, 'Password reset');
+        });
+
         ResetPassword::createUrlUsing(function ($user, string $token): string {
             return FrontendClients::url(request(), 'password_reset_path', [
                 'token' => $token,

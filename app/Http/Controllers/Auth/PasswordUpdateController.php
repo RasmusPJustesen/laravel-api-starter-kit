@@ -23,6 +23,7 @@ class PasswordUpdateController extends Controller
             ]);
 
             \App\Support\Auth\Credentials::revokeAll($user);
+            \App\Support\Auth\SecurityEvents::dispatch($user, 'Password changed');
         });
 
         if ($request->hasSession()) {

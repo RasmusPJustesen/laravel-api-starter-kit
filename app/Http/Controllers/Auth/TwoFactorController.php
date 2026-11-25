@@ -60,6 +60,7 @@ class TwoFactorController extends Controller
             }
 
             $user->forceFill(['two_factor_confirmed_at' => now()])->save();
+            \App\Support\Auth\SecurityEvents::dispatch($user, 'Two-factor authentication enabled');
             $this->revokeOthers($request, $user);
         });
 
@@ -82,6 +83,8 @@ class TwoFactorController extends Controller
             $codes = TwoFactor::generateRecoveryCodes();
             $user->forceFill(['two_factor_recovery_codes' => Crypt::encryptString(json_encode($codes, JSON_THROW_ON_ERROR))])->save();
 
+            \App\Support\Auth\SecurityEvents::dispatch($user, 'Recovery codes regenerated');
+
             return $codes;
         });
 
@@ -103,6 +106,7 @@ class TwoFactorController extends Controller
                 'two_factor_confirmed_at' => null,
                 'two_factor_last_step' => null,
             ])->save();
+            \App\Support\Auth\SecurityEvents::dispatch($user, 'Two-factor authentication disabled');
             $this->revokeOthers($request, $user);
         });
 

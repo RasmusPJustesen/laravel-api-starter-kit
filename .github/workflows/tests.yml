@@ -2,42 +2,45 @@ name: tests
 
 on:
   push:
-    branches:
-      - develop
-      - main
-      - master
+    branches: [main]
   pull_request:
-    branches:
-      - develop
-      - main
-      - master
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  ci:
+  test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        php-version: ['8.3', '8.4', '8.5']
-
+        variant: [base, team, organization]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php-version }}
+          php-version: '8.4'
           tools: composer:v2
-          coverage: xdebug
-
-      - name: Install Dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
-
-      - name: Copy Environment File
-        run: cp .env.example .env
-
-      - name: Generate Application Key
-        run: php artisan key:generate
-
-      - name: Run Tests
-        run: ./vendor/bin/phpunit
+          extensions: pdo_sqlite
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: composer validate --no-check-lock
+      - run: composer install --no-interaction --prefer-dist
+      - run: cp .env.example .env && php artisan key:generate
+      - run: |
+          if [ "$VARIANT" = base ]; then
+            php artisan starter-kit:install --no-teams --auth=both --no-interaction
+          else
+            php artisan starter-kit:install --teams --team-name="$VARIANT" --auth=both --no-interaction
+          fi
+        env:
+          VARIANT: ${{ matrix.variant }}
+      - run: php artisan test
+      - run: php artisan config:cache && php artisan route:cache && php artisan optimize:clear
+      - run: npm install --ignore-scripts
+      - run: composer api:generate
+      - run: npx tsc --noEmit generated/api.d.ts
+      - run: composer audit

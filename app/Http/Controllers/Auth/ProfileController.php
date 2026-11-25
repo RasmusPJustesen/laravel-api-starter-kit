@@ -26,6 +26,7 @@ class ProfileController extends Controller
     public function update(ProfileUpdateRequest $request): UserResource
     {
         $user = $request->user();
+        $previousEmail = $user->email;
         $user->fill($request->validated());
 
         if (! $user->isDirty('email') || ! ($user instanceof MustVerifyEmail)) {
@@ -37,6 +38,7 @@ class ProfileController extends Controller
         $user->email_verified_at = null;
         $user->save();
         $user->sendEmailVerificationNotification();
+        \App\Support\Auth\SecurityEvents::dispatch($user, 'Email changed', $previousEmail);
 
         return new UserResource($user);
     }

@@ -6,6 +6,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
+        web: __DIR__.'/../routes/spa.php',
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/',
@@ -13,7 +14,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->redirectGuestsTo(fn () => null);
-        $middleware->statefulApi();
+        if (config('starter-kit.authentication') !== 'stateless') {
+            $middleware->statefulApi();
+        }
+        $middleware->alias(['password.confirmed' => \App\Http\Middleware\RequirePasswordConfirmation::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

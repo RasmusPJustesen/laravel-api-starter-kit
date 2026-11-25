@@ -18,16 +18,9 @@ Route::middleware('throttle:5,1')->group(function () {
             Route::post('register', RegisterController::class)->name('register');
         }
         Route::post('login', LoginController::class)->name('login');
+        Route::post('two-factor-challenge', [\App\Http\Controllers\Auth\TwoFactorChallengeController::class, 'token'])->name('two-factor.challenge');
     }
 
-    if (in_array(config('starter-kit.authentication'), ['stateful', 'both'], true)) {
-        Route::middleware('web')->prefix('spa')->group(function () {
-            Route::post('login', [SpaAuthController::class, 'login'])->name('spa.login');
-            if (config('starter-kit.registration')) {
-                Route::post('register', [SpaAuthController::class, 'register'])->name('spa.register');
-            }
-        });
-    }
     if (config('starter-kit.password_reset')) {
         Route::post('forgot-password', [PasswordResetController::class, 'store'])->name('password.email');
         Route::post('reset-password', [PasswordResetController::class, 'update'])->name('password.reset.submit');
@@ -40,6 +33,20 @@ Route::get('email/verify/{id}/{hash}', VerifyEmailController::class)
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('logout', LogoutController::class)->name('logout');
+    Route::post('user/confirm-password', [\App\Http\Controllers\Auth\PasswordConfirmationController::class, 'store'])->middleware('throttle:5,1');
+    Route::get('user/confirmed-password', [\App\Http\Controllers\Auth\PasswordConfirmationController::class, 'show']);
+
+    if (config('starter-kit.two_factor')) {
+        Route::get('user/two-factor-authentication', [\App\Http\Controllers\Auth\TwoFactorController::class, 'show']);
+        Route::middleware(['password.confirmed', 'throttle:5,1'])->group(function (): void {
+            Route::post('user/two-factor-authentication', [\App\Http\Controllers\Auth\TwoFactorController::class, 'store']);
+            Route::delete('user/two-factor-authentication', [\App\Http\Controllers\Auth\TwoFactorController::class, 'destroy']);
+            Route::get('user/two-factor-secret-key', [\App\Http\Controllers\Auth\TwoFactorController::class, 'setup']);
+            Route::post('user/confirmed-two-factor-authentication', [\App\Http\Controllers\Auth\TwoFactorController::class, 'confirm']);
+            Route::get('user/two-factor-recovery-codes', [\App\Http\Controllers\Auth\TwoFactorController::class, 'recoveryCodes']);
+            Route::post('user/two-factor-recovery-codes', [\App\Http\Controllers\Auth\TwoFactorController::class, 'regenerate']);
+        });
+    }
     Route::post('token/refresh', RefreshTokenController::class)->name('token.refresh');
 
     Route::get('me', [ProfileController::class, 'show'])->name('profile.show');

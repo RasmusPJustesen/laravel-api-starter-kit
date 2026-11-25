@@ -27,6 +27,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        FrontendClients::configureOrigins();
 
         \Laravel\Sanctum\Sanctum::authenticateAccessTokensUsing(
             fn ($token, bool $valid): bool => $valid && config('starter-kit.authentication') !== 'stateful'
@@ -58,6 +59,19 @@ class AppServiceProvider extends ServiceProvider
                 'token' => $token,
                 'email' => $user->getEmailForPasswordReset(),
             ]);
+        });
+
+        \Illuminate\Auth\Notifications\VerifyEmail::createUrlUsing(function ($user): string {
+            $signed = \Illuminate\Support\Facades\URL::temporarySignedRoute(
+                'verification.verify',
+                now()->addMinutes(config('auth.verification.expire', 60)),
+                ['id' => $user->getKey(), 'hash' => sha1($user->getEmailForVerification())],
+            );
+            $client = FrontendClients::resolve(request());
+
+            return empty($client['email_verification_path'])
+                ? $signed
+                : FrontendClients::link($client, 'email_verification_path', ['verification_url' => $signed]);
         });
 
         DevCommands::except('vite');

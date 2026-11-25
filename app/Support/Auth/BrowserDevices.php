@@ -35,7 +35,7 @@ final class BrowserDevices
             'remember_hash' => $secret ? hash('sha256', $secret) : null,
             'remember_until' => $secret ? now()->addMinutes($minutes) : null,
             'name' => $name,
-            'client_id' => substr((string) $request->header('X-Client', config('frontends.default')), 0, 255),
+            'client_id' => \App\Support\FrontendClients::resolve($request)['id'],
             'ip_address' => $request->ip(),
             'user_agent' => substr((string) $request->userAgent(), 0, 512),
             'last_active_at' => now(),
@@ -51,7 +51,7 @@ final class BrowserDevices
 
     public static function restore(Request $request): void
     {
-        if (! $request->hasSession() || config('starter-kit.authentication') === 'stateless') {
+        if (! $request->hasSession() || config('starter-kit.authentication') === 'stateless' || $request->bearerToken()) {
             return;
         }
 
@@ -59,7 +59,7 @@ final class BrowserDevices
         $guard = Auth::guard('web');
         if ($id) {
             $device = self::table()->where('id', $id)->first();
-            if ($device && $guard->id() === $device->user_id && $device->session_id === $request->session()->getId()) {
+            if ($device && (string) $guard->id() === (string) $device->user_id && $device->session_id === $request->session()->getId()) {
                 self::table()->where('id', $id)->update(['last_active_at' => now()]);
                 return;
             }

@@ -16,7 +16,10 @@ class PasswordUpdateController extends Controller
     public function __invoke(PasswordUpdateRequest $request): MessageResponse
     {
         DB::transaction(function () use ($request): void {
-            $user = $request->user();
+            $user = \App\Models\User::query()->lockForUpdate()->findOrFail($request->user()->getKey());
+            if (! \Illuminate\Support\Facades\Hash::check($request->validated('current_password'), $user->getAuthPassword())) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['current_password' => [__('auth.password')]]);
+            }
 
             $user->update([
                 'password' => $request->validated('password'),

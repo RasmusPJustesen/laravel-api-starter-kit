@@ -18,12 +18,7 @@ return [
     |
     */
 
-    'stateful' => env('STARTER_KIT_AUTH', 'both') === 'stateless' ? [] : explode(',', (string) env('SANCTUM_STATEFUL_DOMAINS', sprintf(
-        '%s%s',
-        'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
-        Sanctum::currentApplicationUrlWithPort(),
-        // Sanctum::currentRequestHost(),
-    ))),
+    'stateful' => env('STARTER_KIT_AUTH', 'both') === 'stateless' ? [] : (env('SANCTUM_STATEFUL_DOMAINS') === null ? null : array_values(array_filter(array_map('trim', explode(',', (string) env('SANCTUM_STATEFUL_DOMAINS')))))),
 
     /*
     |--------------------------------------------------------------------------

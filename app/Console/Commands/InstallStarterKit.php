@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 
 class InstallStarterKit extends Command
 {
-    protected $signature = 'starter-kit:install {--teams} {--no-teams} {--team-name=} {--team-plural=} {--personal-teams} {--auth=}';
+    protected $signature = 'starter-kit:install {--teams} {--no-teams} {--team-name=} {--team-plural=} {--personal-teams} {--auth=} {--frontend=* : JSON client definitions}';
 
     protected $description = 'Configure the headless starter kit before running migrations';
 
@@ -29,6 +29,14 @@ class InstallStarterKit extends Command
 
         if (File::exists(base_path('.starter-kit-installed'))) {
             $this->error('The starter kit is already configured. Do not overwrite generated application files.');
+            return self::FAILURE;
+        }
+
+        try {
+            $frontends = $this->frontendConfiguration($interactive, $auth);
+        } catch (\InvalidArgumentException|\JsonException $exception) {
+            $this->error($exception->getMessage());
+
             return self::FAILURE;
         }
 
@@ -56,9 +64,68 @@ class InstallStarterKit extends Command
             ? preg_replace('/^STARTER_KIT_AUTH=.*$/m', $line, $content)
             : rtrim($content).PHP_EOL.$line.PHP_EOL;
         File::put($env, $content);
+        if ($frontends !== null) {
+            File::put(config_path('frontend-clients.php'), "<?php\n\nreturn ".var_export($frontends, true).";\n");
+        }
+
         File::put(base_path('.starter-kit-installed'), "configured\n");
         $this->info('Configuration saved. Run php artisan optimize:clear and php artisan migrate.');
 
         return self::SUCCESS;
+    }
+
+    private function frontendConfiguration(bool $interactive, string $auth): ?array
+    {
+        $definitions = [];
+        foreach ($this->option('frontend') as $json) {
+            $definitions[] = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        }
+
+        if ($interactive && $definitions === [] && $this->confirm('Configure frontend clients now?', false)) {
+            do {
+                $id = $this->ask('Frontend identifier', $definitions === [] ? 'web' : 'mobile');
+                $url = $this->ask('Frontend URL (HTTPS recommended)', 'http://localhost:3000');
+                $mode = $auth === 'both' ? $this->choice('Client authentication', ['stateful', 'stateless'], 'stateful') : $auth;
+                $origin = $this->ask('Browser origin, if any (leave blank for none)', $mode === 'stateful' ? \App\Support\FrontendClients::origin($url) : null);
+                $definitions[] = ['id' => $id, 'url' => $url, 'authentication' => $mode, 'origin' => $origin];
+            } while ($this->confirm('Configure another frontend?', false));
+        }
+
+        if ($definitions === []) {
+            return null;
+        }
+
+        if (File::exists(config_path('frontend-clients.php'))) {
+            throw new \InvalidArgumentException('Frontend configuration already exists.');
+        }
+
+        $clients = [];
+        foreach ($definitions as $definition) {
+            if (! is_array($definition)) {
+                throw new \InvalidArgumentException('Frontend definitions must be JSON objects.');
+            }
+            $id = $definition['id'] ?? '';
+            $url = $definition['url'] ?? '';
+            $mode = $definition['authentication'] ?? ($auth === 'both' ? 'stateful' : $auth);
+            $origin = $definition['origin'] ?? ($mode === 'stateful' ? \App\Support\FrontendClients::origin($url) : null);
+            if (! is_string($id) || ! preg_match('/^[a-z][a-z0-9_-]{0,39}$/D', $id) || isset($clients[$id]) ||
+                ! is_string($url) || ! \App\Support\FrontendClients::origin($url) ||
+                parse_url($url, PHP_URL_QUERY) !== null || parse_url($url, PHP_URL_FRAGMENT) !== null ||
+                ! in_array($mode, ['stateful', 'stateless'], true) || ($auth !== 'both' && $mode !== $auth) ||
+                ($origin !== null && (! is_string($origin) || \App\Support\FrontendClients::origin($origin) !== $origin))) {
+                throw new \InvalidArgumentException('Invalid or duplicate frontend definition.');
+            }
+            $clients[$id] = [
+                'name' => $id,
+                'url' => $url,
+                'authentication' => $mode,
+                'origin' => $origin,
+                'password_reset_path' => '/reset-password',
+                'email_verification_path' => '/verify-email',
+                'login_path' => '/login',
+            ];
+        }
+
+        return ['default' => array_key_first($clients), 'clients' => $clients];
     }
 }

@@ -24,8 +24,11 @@ class PasswordResetController extends Controller
 
     public function update(ResetPasswordRequest $request): MessageResponse
     {
-        $status = Password::reset($request->validated(), function (User $user, string $password): void {
+        $lock = \Illuminate\Support\Facades\Cache::lock('password-reset:'.hash('sha256', strtolower($request->validated('email'))), 30);
+        try {
+            $status = $lock->block(5, fn () => Password::reset($request->validated(), function (User $user, string $password): void {
             DB::transaction(function () use ($user, $password): void {
+                $user = User::query()->lockForUpdate()->findOrFail($user->getKey());
                 $user->forceFill([
                     'password' => $password,
                     'remember_token' => Str::random(60),
@@ -34,7 +37,10 @@ class PasswordResetController extends Controller
             });
 
             event(new PasswordReset($user));
-        });
+            }));
+        } catch (\Illuminate\Contracts\Cache\LockTimeoutException) {
+            abort(429, __('Please try again.'));
+        }
 
         if ($status !== Password::PASSWORD_RESET) {
             throw ValidationException::withMessages(['email' => [__('The password reset token is invalid or expired.')]]);

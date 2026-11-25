@@ -14,7 +14,7 @@ final class DeviceTokens
         $token = $user->createToken($name, $abilities);
         $token->accessToken->forceFill([
             'device_id' => $deviceId ?? (string) Str::uuid(),
-            'client_id' => substr((string) $request->header('X-Client', config('frontends.default')), 0, 255),
+            'client_id' => \App\Support\FrontendClients::resolve($request)['id'],
             'ip_address' => $request->ip(),
             'user_agent' => substr((string) $request->userAgent(), 0, 512),
         ])->save();

@@ -10,7 +10,10 @@ final class TeamScaffolder
 {
     public function install(string $name, string $plural, bool $personal): void
     {
-        $singular = Str::snake($name);
+        if (File::exists(base_path('.starter-kit-teams.json'))) {
+            throw new InvalidArgumentException('The team module is already installed.');
+        }
+        $singular = Str::snake(trim($name));
         $plural = Str::snake($plural);
 
         foreach ([$singular, $plural] as $value) {
@@ -19,23 +22,11 @@ final class TeamScaffolder
             }
         }
 
-        if ($singular === $plural || in_array($singular, ['user', 'session', 'token', 'auth', 'membership', 'member', 'invitation', 'class', 'trait', 'enum', 'interface', 'match', 'self', 'parent', 'static', 'resource'], true)) {
+        if ($singular === $plural || in_array($singular, ['user', 'session', 'token', 'auth', 'membership', 'member', 'invitation', 'class', 'trait', 'enum', 'interface', 'match', 'self', 'parent', 'static', 'resource', 'string', 'int', 'float', 'bool', 'array', 'object', 'null', 'true', 'false', 'void', 'never', 'mixed', 'namespace', 'function', 'new', 'default', 'switch', 'case', 'return', 'list', 'global'], true)) {
             throw new InvalidArgumentException('This name conflicts with a reserved identifier or has an identical plural. Supply a different name or plural.');
         }
 
-        $map = [
-            'Teams' => Str::studly($plural),
-            'teamMembers' => Str::camel($singular).'Members',
-            'teamMemberships' => Str::camel($singular).'Memberships',
-            'teamRole' => Str::camel($singular).'Role',
-            'teamName' => Str::camel($singular).'Name',
-            'Team' => Str::studly($singular),
-            'teams' => $plural,
-            'team' => $singular,
-        ];
-
-        // Apply the explicit vocabulary in one pass, never recursively.
-        $render = static fn (string $value): string => strtr($value, $map);
+        $render = static fn (string $value): string => TeamTemplate::render($value, $singular, $plural, $personal);
         $root = base_path('stubs/teams');
         $output = [];
 
@@ -51,6 +42,9 @@ final class TeamScaffolder
                 }
                 $target = $render($relative);
                 $content = $render($file->getContents());
+                if (isset($output[$target])) {
+                    throw new InvalidArgumentException('Duplicate generated path: '.$target);
+                }
                 $output[$target] = $content;
             }
         }
@@ -58,6 +52,9 @@ final class TeamScaffolder
         $model = Str::studly($singular);
         $models = Str::studly($plural);
         $route = $plural;
+        if (in_array($plural, ['users', 'user', 'sessions', 'invitations', 'docs', 'spa', 'email', 'ready', 'me', 'token', 'login', 'logout', 'register', 'storage', 'sanctum'], true)) {
+            throw new InvalidArgumentException('The plural conflicts with an existing API route.');
+        }
         $output['config/'.$plural.'.php'] = "<?php\n\nreturn ['personal' => ".($personal ? 'true' : 'false')."];\n";
         $userPath = app_path('Models/User.php');
         $user = File::get($userPath);
@@ -95,15 +92,40 @@ final class TeamScaffolder
                 throw new InvalidArgumentException('File already exists: '.$path);
             }
         }
+        $changes = [
+            $profilePath => $newProfile,
+            $userPath => $modified,
+            $providerPath => $newProvider,
+            $apiPath => rtrim($api)."\n\nrequire __DIR__.'/".$route.".php';\n",
+            $consolePath => rtrim($console)."\n\n\\Illuminate\\Support\\Facades\\Schedule::call(fn () => \\App\\Models\\".$model."Invitation::query()->whereNull('accepted_at')->where('expires_at', '<=', now())->delete())->daily();\n",
+        ];
         foreach ($output as $path => $content) {
-            File::ensureDirectoryExists(dirname(base_path($path)));
-            File::put(base_path($path), $content);
+            $changes[base_path($path)] = $content;
         }
+        $changes[base_path('.starter-kit-teams.json')] = json_encode([
+            'singular' => $singular,
+            'plural' => $plural,
+            'personal' => $personal,
+        ], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT)."\n";
 
-        File::put($profilePath, $newProfile);
-        File::put($userPath, $modified);
-        File::put($providerPath, $newProvider);
-        File::put($apiPath, rtrim($api)."\n\nrequire __DIR__.'/".$route.".php';\n");
-        File::put($consolePath, rtrim($console)."\n\n\\Illuminate\\Support\\Facades\\Schedule::call(fn () => \\App\\Models\\".$model."Invitation::query()->whereNull('accepted_at')->where('expires_at', '<=', now())->delete())->daily();\n");
+        $backups = [];
+        try {
+            foreach ($changes as $path => $content) {
+                $backups[$path] = File::exists($path) ? File::get($path) : null;
+                File::ensureDirectoryExists(dirname($path));
+                if (File::put($path, $content) === false) {
+                    throw new \RuntimeException('Could not write '.$path);
+                }
+            }
+        } catch (\Throwable $exception) {
+            foreach (array_reverse($backups, true) as $path => $original) {
+                if ($original === null) {
+                    File::delete($path);
+                } else {
+                    File::put($path, $original);
+                }
+            }
+            throw new InvalidArgumentException('Scaffolding failed; file changes rolled back.', previous: $exception);
+        }
     }
 }

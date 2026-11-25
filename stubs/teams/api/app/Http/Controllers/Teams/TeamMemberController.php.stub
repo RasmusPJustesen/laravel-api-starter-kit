@@ -26,10 +26,12 @@ class TeamMemberController extends Controller
 
         $newRole = TeamRole::from($request->validated('role'));
 
-        $team->memberships()
-            ->where('user_id', $user->id)
-            ->firstOrFail()
-            ->update(['role' => $newRole]);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($request, $team, $user, $newRole): void {
+            $team = Team::query()->lockForUpdate()->findOrFail($team->getKey());
+            Gate::authorize('updateMember', $team);
+            abort_if($team->owner()?->is($user), 403);
+            $team->memberships()->where('user_id', $user->id)->firstOrFail()->update(['role' => $newRole]);
+        });
 
         $member = $team->members()->where('users.id', $user->id)->firstOrFail();
 
@@ -44,10 +46,13 @@ class TeamMemberController extends Controller
 
         abort_if($team->owner()?->is($user), Response::HTTP_FORBIDDEN, __('The team owner cannot be removed.'));
 
-        $team->memberships()
-            ->where('user_id', $user->id)
-            ->firstOrFail()
-            ->delete();
+        \Illuminate\Support\Facades\DB::transaction(function () use ($team, $user): void {
+            $team = Team::query()->lockForUpdate()->findOrFail($team->getKey());
+            Gate::authorize('removeMember', $team);
+            abort_if($team->owner()?->is($user), 403);
+            $team->memberships()->where('user_id', $user->id)->firstOrFail()->delete();
+            \Illuminate\Support\Facades\DB::afterCommit(fn () => event(new \App\Events\Teams\TeamLifecycleChanged($team, 'member_removed', $user)));
+        });
 
         return response()->noContent();
     }

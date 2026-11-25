@@ -66,7 +66,9 @@ class TeamController extends Controller
         $team = DB::transaction(function () use ($request, $team) {
             $team = Team::whereKey($team->id)->lockForUpdate()->firstOrFail();
 
+            Gate::authorize('update', $team);
             $team->update(['name' => $request->validated('name')]);
+            DB::afterCommit(fn () => event(new \App\Events\Teams\TeamLifecycleChanged($team, 'updated', $request->user())));
 
             return $team;
         });
@@ -82,9 +84,12 @@ class TeamController extends Controller
 
         $user = $request->user();
 
-        $team->memberships()
-            ->where('user_id', $user->id)
-            ->delete();
+        DB::transaction(function () use ($team, $user): void {
+            $team = Team::query()->lockForUpdate()->findOrFail($team->getKey());
+            Gate::authorize('leave', $team);
+            $team->memberships()->where('user_id', $user->id)->delete();
+            DB::afterCommit(fn () => event(new \App\Events\Teams\TeamLifecycleChanged($team, 'member_removed', $user)));
+        });
 
         return response()->noContent();
     }
@@ -93,9 +98,12 @@ class TeamController extends Controller
     public function destroy(DeleteTeamRequest $request, Team $team): Response
     {
         DB::transaction(function () use ($team): void {
+            $team = Team::query()->lockForUpdate()->findOrFail($team->getKey());
+            Gate::authorize('delete', $team);
             $team->invitations()->delete();
             $team->memberships()->delete();
             $team->delete();
+            DB::afterCommit(fn () => event(new \App\Events\Teams\TeamLifecycleChanged($team, 'deleted')));
         });
 
         return response()->noContent();

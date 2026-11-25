@@ -25,6 +25,8 @@ class CreateTeam
                 'role' => TeamRole::Owner,
             ]);
 
+            DB::afterCommit(fn () => event(new \App\Events\Teams\TeamLifecycleChanged($team, 'created', $user)));
+
             return $team;
         });
     }

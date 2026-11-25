@@ -32,6 +32,8 @@ class Team extends Model
     /** @use HasFactory<TeamFactory> */
     use GeneratesUniqueTeamSlugs, HasFactory, SoftDeletes;
 
+    protected $table = 'teams';
+
     /**
      * Bootstrap the model and its traits.
      */

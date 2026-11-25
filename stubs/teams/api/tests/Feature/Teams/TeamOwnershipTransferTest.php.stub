@@ -1,0 +1,40 @@
+<?php
+
+namespace Tests\Feature\Teams;
+
+use App\Actions\Teams\CreateTeam;
+use App\Enums\TeamRole;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class TeamOwnershipTransferTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_owner_can_transfer_ownership_after_password_confirmation(): void
+    {
+        $owner = User::factory()->create();
+        $member = User::factory()->create();
+        $team = app(CreateTeam::class)->handle($owner, 'Shared team');
+        $team->members()->attach($member, ['role' => TeamRole::Member->value]);
+        $token = $owner->createToken('test')->plainTextToken;
+        $url = route('teams.ownership.transfer', ['team' => $team, 'user' => $member]);
+
+        $this->withToken($token)->postJson($url)->assertForbidden();
+        $this->withToken($token)->postJson('/user/confirm-password', ['password' => 'password'])->assertNoContent();
+        $this->withToken($token)->postJson($url)->assertNoContent();
+        $this->assertTrue($member->ownsTeam($team));
+        $this->assertSame(TeamRole::Admin, $owner->teamRole($team));
+        $this->assertSame(1, $team->memberships()->where('role', TeamRole::Owner->value)->count());
+    }
+
+    public function test_shared_team_owner_cannot_delete_account_without_transferring_ownership(): void
+    {
+        $owner = User::factory()->create();
+        app(CreateTeam::class)->handle($owner, 'Shared team');
+        $this->withToken($owner->createToken('test')->plainTextToken)
+            ->deleteJson(route('profile.destroy'), ['password' => 'password'])->assertConflict();
+        $this->assertModelExists($owner);
+    }
+}

@@ -19,14 +19,18 @@ class AcceptTeamInvitationController extends Controller
         $user = $request->user();
 
         DB::transaction(function () use ($user, $invitation) {
+            $team = \App\Models\Team::query()->lockForUpdate()->findOrFail($invitation->team_id);
             $invitation = TeamInvitation::query()->lockForUpdate()->findOrFail($invitation->getKey());
             abort_unless($invitation->isPending() && $user->hasVerifiedEmail() && strcasecmp($user->email, $invitation->email) === 0, 422);
-            $invitation->team->memberships()->firstOrCreate(
+            $membership = $team->memberships()->firstOrCreate(
                 ['user_id' => $user->id],
                 ['role' => $invitation->role],
             );
 
             $invitation->update(['accepted_at' => now()]);
+            if ($membership->wasRecentlyCreated) {
+                DB::afterCommit(fn () => event(new \App\Events\Teams\TeamLifecycleChanged($team, 'member_added', $user)));
+            }
         });
 
         return new MessageResponse('Invitation accepted successfully.');

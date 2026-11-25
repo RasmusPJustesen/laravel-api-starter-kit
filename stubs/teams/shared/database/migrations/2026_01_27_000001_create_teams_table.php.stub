@@ -22,7 +22,7 @@ return new class extends Migration
 
         Schema::create('team_members', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('team_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('team_id')->constrained('teams')->cascadeOnDelete();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('role');
             $table->timestamps();
@@ -33,7 +33,7 @@ return new class extends Migration
         Schema::create('team_invitations', function (Blueprint $table) {
             $table->id();
             $table->string('code', 64)->unique();
-            $table->foreignId('team_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('team_id')->constrained('teams')->cascadeOnDelete();
             $table->string('email');
             $table->string('role');
             $table->foreignId('invited_by')->constrained('users')->cascadeOnDelete();
@@ -41,6 +41,28 @@ return new class extends Migration
             $table->timestamp('accepted_at')->nullable();
             $table->timestamps();
         });
+
+        if (config('teams.personal')) {
+            \Illuminate\Support\Facades\DB::table('users')->orderBy('id')->chunkById(200, function ($users): void {
+                foreach ($users as $user) {
+                    $now = now();
+                    $id = \Illuminate\Support\Facades\DB::table('teams')->insertGetId([
+                        'name' => \Illuminate\Support\Str::limit($user->name."'s Team", 255, ''),
+                        'slug' => 'personal-'.$user->id,
+                        'is_personal' => true,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                    \Illuminate\Support\Facades\DB::table('team_members')->insert([
+                        'team_id' => $id,
+                        'user_id' => $user->id,
+                        'role' => 'owner',
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                }
+            });
+        }
     }
 
     /**

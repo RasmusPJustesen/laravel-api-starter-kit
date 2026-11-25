@@ -8,6 +8,11 @@ class TeamResource extends JsonApiResource
 {
     protected bool $usesRequestQueryString = false;
 
+    public function toType(\Illuminate\Http\Request $request): string
+    {
+        return 'teams';
+    }
+
     /**
      * The resource's attributes.
      *

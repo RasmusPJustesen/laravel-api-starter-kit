@@ -17,6 +17,7 @@ class ScrambleServiceProvider extends ServiceProvider
         );
 
         Scramble::configure()
+            ->withDocumentTransformers(fn (\Dedoc\Scramble\Support\Generator\OpenApi $api) => \App\Support\ApiContract::transform($api))
             ->expose(ui: '/docs', document: '/docs/api.json');
     }
 }

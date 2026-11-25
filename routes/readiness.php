@@ -9,6 +9,6 @@ Route::get('/ready', function () {
 
         return response()->json(['status' => 'ready']);
     } catch (\Throwable) {
-        return response()->json(['status' => 'unavailable'], 503);
+        return \App\Support\ApiErrors::response(503, 'SERVER_ERROR', __('Database unavailable.'));
     }
 })->middleware('throttle:60,1');

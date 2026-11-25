@@ -22,13 +22,13 @@ final class ApiErrors
             return $response;
         }
         $status = $response->getStatusCode();
-        $body = $response->getData(true);
-
-        // Client errors must have a stable public representation, even in debug
-        // mode. In particular, verification failures must not reveal call sites.
-        if ($status < 500) {
-            unset($body['exception'], $body['file'], $body['line'], $body['trace']);
+        $original = $response->getData(true);
+        $message = $status >= 500 ? __('Server error.') : ($original['message'] ?? __('Request failed.'));
+        $body = ['message' => (string) $message];
+        if ($exception instanceof ValidationException) {
+            $body['errors'] = $exception->errors();
         }
+
         $codes = [401 => 'UNAUTHENTICATED', 403 => 'FORBIDDEN', 404 => 'NOT_FOUND', 406 => 'UNSUPPORTED_API_VERSION', 409 => 'CONFLICT', 419 => 'CSRF_TOKEN_MISMATCH', 422 => 'VALIDATION_FAILED', 429 => 'RATE_LIMITED'];
         $code = $response->headers->get('X-API-Error-Code') ?? ($codes[$status] ?? ($status >= 500 ? 'SERVER_ERROR' : 'REQUEST_FAILED'));
         $response->headers->remove('X-API-Error-Code');
@@ -42,7 +42,7 @@ final class ApiErrors
                 }
             }
         } else {
-            $body['error_details'][] = ['status' => (string) $status, 'code' => $code, 'detail' => $status >= 500 ? __('Server error.') : ($body['message'] ?? __('Request failed.'))];
+            $body['error_details'][] = ['status' => (string) $status, 'code' => $code, 'detail' => $status >= 500 ? __('Server error.') : $body['message']];
         }
         $response->setData($body);
 

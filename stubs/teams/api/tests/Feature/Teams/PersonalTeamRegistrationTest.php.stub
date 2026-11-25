@@ -1,0 +1,51 @@
+<?php
+
+namespace Tests\Feature\Teams;
+
+use App\Enums\TeamRole;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
+use Tests\TestCase;
+
+class PersonalTeamRegistrationTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_registration_creates_a_personal_team_only_when_enabled(): void
+    {
+        Notification::fake();
+        config(['teams.personal' => true]);
+
+        $this->postJson(route('register'), [
+            'name' => 'Test User',
+            'email' => 'enabled@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ])->assertCreated();
+
+        $user = User::where('email', 'enabled@example.com')->firstOrFail();
+        $personalTeam = $user->personalTeam();
+        $this->assertNotNull($personalTeam);
+        $this->assertTrue($personalTeam->is_personal);
+        $this->assertSame(TeamRole::Owner, $user->teamRole($personalTeam));
+        $this->assertSame(1, $user->teams()->count());
+    }
+
+    public function test_registration_does_not_create_a_personal_team_when_disabled(): void
+    {
+        Notification::fake();
+        config(['teams.personal' => false]);
+
+        $this->postJson(route('register'), [
+            'name' => 'Test User',
+            'email' => 'disabled@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ])->assertCreated();
+
+        $user = User::where('email', 'disabled@example.com')->firstOrFail();
+        $this->assertNull($user->personalTeam());
+        $this->assertSame(0, $user->teams()->count());
+    }
+}

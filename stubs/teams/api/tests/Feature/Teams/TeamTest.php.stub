@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Teams;
 
+use App\Actions\Teams\CreateTeam;
 use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\User;
@@ -17,6 +18,9 @@ class TeamTest extends TestCase
         $user = User::factory()->create();
         $team = Team::factory()->create();
         $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
+        $secondTeam = Team::factory()->create();
+        $secondTeam->members()->attach($user, ['role' => TeamRole::Member->value]);
+        Team::factory()->create(); // Unrelated teams must not appear.
 
         $response = $this
             ->actingAs($user)
@@ -28,7 +32,9 @@ class TeamTest extends TestCase
                     ['type', 'id', 'attributes' => ['name', 'slug', 'is_personal']],
                 ],
             ])
-            ->assertJsonCount(2, 'data');
+            ->assertJsonCount(2, 'data')
+            ->assertJsonFragment(['id' => (string) $team->id])
+            ->assertJsonFragment(['id' => (string) $secondTeam->id]);
     }
 
     public function test_team_can_be_created(): void
@@ -199,7 +205,7 @@ class TeamTest extends TestCase
     public function test_personal_teams_cannot_be_left(): void
     {
         $user = User::factory()->create();
-        $personalTeam = $user->personalTeam();
+        $personalTeam = app(CreateTeam::class)->handle($user, $user->name."'s Team", isPersonal: true);
 
         $this
             ->actingAs($user)
@@ -238,7 +244,7 @@ class TeamTest extends TestCase
     public function test_personal_teams_cannot_be_deleted(): void
     {
         $user = User::factory()->create();
-        $personalTeam = $user->personalTeam();
+        $personalTeam = app(CreateTeam::class)->handle($user, $user->name."'s Team", isPersonal: true);
 
         $response = $this
             ->actingAs($user)

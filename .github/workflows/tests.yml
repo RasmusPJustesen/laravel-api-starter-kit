@@ -30,7 +30,8 @@ jobs:
       - run: composer validate --no-check-lock
       - run: composer install --no-interaction --prefer-dist
       - run: cp .env.example .env && php artisan key:generate
-      - run: |
+      - id: configure
+        run: |
           if [ "$VARIANT" = base ]; then
             php artisan starter-kit:install --no-teams --auth=both --no-interaction
           else
@@ -39,8 +40,15 @@ jobs:
         env:
           VARIANT: ${{ matrix.variant }}
       - run: php artisan test
-      - run: php artisan config:cache && php artisan route:cache && php artisan optimize:clear
-      - run: npm install --ignore-scripts
-      - run: composer api:generate
-      - run: npx tsc --noEmit generated/api.d.ts
-      - run: composer audit
+      - if: ${{ !cancelled() && steps.configure.outcome == 'success' }}
+        run: php artisan config:cache && php artisan route:cache && php artisan optimize:clear
+      - id: node_dependencies
+        if: ${{ !cancelled() && steps.configure.outcome == 'success' }}
+        run: npm install --ignore-scripts
+      - id: api_contract
+        if: ${{ !cancelled() && steps.node_dependencies.outcome == 'success' }}
+        run: composer api:generate
+      - if: ${{ !cancelled() && steps.api_contract.outcome == 'success' }}
+        run: npx tsc --noEmit generated/api.d.ts
+      - if: ${{ !cancelled() && steps.configure.outcome == 'success' }}
+        run: composer audit

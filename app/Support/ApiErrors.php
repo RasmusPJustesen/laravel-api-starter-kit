@@ -16,6 +16,12 @@ final class ApiErrors
         }
         $status = $response->getStatusCode();
         $body = $response->getData(true);
+
+        // Client errors must have a stable public representation, even in debug
+        // mode. In particular, verification failures must not reveal call sites.
+        if ($status < 500) {
+            unset($body['exception'], $body['file'], $body['line'], $body['trace']);
+        }
         $codes = [401 => 'UNAUTHENTICATED', 403 => 'FORBIDDEN', 404 => 'NOT_FOUND', 406 => 'UNSUPPORTED_API_VERSION', 409 => 'CONFLICT', 419 => 'CSRF_TOKEN_MISMATCH', 422 => 'VALIDATION_FAILED', 429 => 'RATE_LIMITED'];
         $code = $codes[$status] ?? ($status >= 500 ? 'SERVER_ERROR' : 'REQUEST_FAILED');
 

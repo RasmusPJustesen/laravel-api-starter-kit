@@ -235,3 +235,78 @@ jobs:
           test -f .starter-kit-installed
           php artisan migrate:status
           php artisan test
+
+  first-release:
+    # One-time publication of the requested beta, only from a green main push.
+    if: ${{ github.repository == 'RasmusPJustesen/laravel-api-starter-kit' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.head_commit.message == 'Prepare v0.1.0-beta.1 release' }}
+    needs: [quality, test, auth-mode, databases, installation]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: v0.1.0-beta.1
+    steps:
+      - name: Publish verified beta release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$(gh api "repos/$GH_REPO/branches/main" --jq '.commit.sha')" != "$GITHUB_SHA" ]; then
+            echo "Main has moved; refusing to publish an outdated release."
+            exit 1
+          fi
+          if existing="$(gh api "repos/$GH_REPO/commits/$RELEASE_TAG" --jq '.sha' 2>/dev/null)"; then
+            if [ "$existing" != "$GITHUB_SHA" ]; then
+              echo "The release tag already points to another commit."
+              exit 1
+            fi
+          fi
+          if ! gh release view "$RELEASE_TAG" --json tagName >/dev/null 2>&1; then
+            cat > "$RUNNER_TEMP/release-notes.md" <<'RELEASE_NOTES'
+            ## First public beta
+            
+            A headless Laravel 13 API starter kit inspired by the Laravel Maestro API and teams proposals, without an application frontend.
+            
+            ### What's included
+            
+            - Stateful Sanctum cookie authentication, stateless bearer tokens, or both.
+            - Registration, profile management, email verification, password reset and password confirmation.
+            - Optional or required TOTP two-factor authentication, QR setup and single-use recovery codes.
+            - Unified browser/native device management, revocable persistent sessions and bearer token rotation.
+            - Multiple frontend configurations, trusted origins and frontend-specific notification links.
+            - Optional collaboration module with custom singular/plural naming, personal entities, roles, permissions, invitations and ownership transfer.
+            - Scalar documentation, generated OpenAPI and TypeScript contracts, typed errors and locale negotiation.
+            - Laravel installer and Composer project integration, deployment guidance and automated tests.
+            
+            ### Try the beta
+            
+            Requirements: PHP 8.3+, Composer 2, and Node.js 22+ for API type generation.
+            
+            ```bash
+            git clone --branch v0.1.0-beta.1 --single-branch https://github.com/RasmusPJustesen/laravel-api-starter-kit.git my-api
+            cd my-api
+            composer setup
+            php artisan serve
+            ```
+            
+            After Packagist registration and indexing, the explicit version can be installed with:
+            
+            ```bash
+            composer create-project rasmuspjustesen/laravel-api-starter-kit my-api 0.1.0-beta.1
+            ```
+            
+            ### Validation and limitations
+            
+            This release is published only after the complete GitHub Actions test matrix passes: PHP 8.3–8.5, SQLite/MySQL/PostgreSQL, base and custom-named team variants, both standalone authentication modes, HTTP contract checks, installation, Pint and Larastan. It is a beta, not an independently audited production-ready release. Packagist installation still needs verification after registry publication.
+            
+            ### Credits
+            
+            Based on [Laravel Maestro #78](https://github.com/laravel/maestro/pull/78) and [#80](https://github.com/laravel/maestro/pull/80), authored by Wendell Adriel, with thanks to Joe Tannenbaum and the Laravel community. This is an independent MIT-licensed community project.
+            RELEASE_NOTES
+            printf '\n[Passing CI run](https://github.com/%s/actions/runs/%s) · Commit `%s`\n' "$GH_REPO" "$GITHUB_RUN_ID" "$GITHUB_SHA" >> "$RUNNER_TEMP/release-notes.md"
+            gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "$RELEASE_TAG — First public beta" --notes-file "$RUNNER_TEMP/release-notes.md" --prerelease --latest=false
+          fi
+          test "$(gh api "repos/$GH_REPO/commits/$RELEASE_TAG" --jq '.sha')" = "$GITHUB_SHA"
+          gh release view "$RELEASE_TAG" --json tagName,isDraft,isPrerelease,url,targetCommitish
+          test "$(gh release view "$RELEASE_TAG" --json isDraft,isPrerelease --jq '(.isPrerelease and (.isDraft | not))')" = true

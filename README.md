@@ -4,7 +4,7 @@
 
 A headless, API-first Laravel 13 starter kit. Use Laravel's own conventions, Sanctum, Fortify's TOTP provider and native JSON:API resources without an application frontend. Inspired by the Laravel Maestro API and teams proposals ([#78](https://github.com/laravel/maestro/pull/78), [#80](https://github.com/laravel/maestro/pull/80)).
 
-**Development preview.** No stable release or Packagist publication is announced here. Review the deployment and security guidance before using the kit.
+**Beta preview.** See [v0.1.0-beta.1](https://github.com/RasmusPJustesen/laravel-api-starter-kit/releases/tag/v0.1.0-beta.1). This prerelease has not undergone an independent security audit and is not a stable production-ready release.
 
 ## Features
 
@@ -24,7 +24,7 @@ PHP 8.3+, Composer 2, a supported Laravel database (SQLite, MySQL or PostgreSQL)
 Until the package is published on Packagist, clone the repository:
 
 ```sh
-git clone https://github.com/RasmusPJustesen/laravel-api-starter-kit.git my-api
+git clone --branch v0.1.0-beta.1 --single-branch https://github.com/RasmusPJustesen/laravel-api-starter-kit.git my-api
 cd my-api
 composer setup
 php artisan serve
@@ -32,12 +32,13 @@ php artisan serve
 
 The setup command creates the environment file and key if needed, runs the starter-kit installer and migrates the configured database. For a new independent Git repository, remove the cloned Git history and initialize your own repository; preserve the upstream license and credits.
 
-The intended public distribution commands after registration on Packagist are:
+After registration on Packagist, install this explicit prerelease with Composer:
 
 ```sh
-laravel new my-api --using=rasmuspjustesen/laravel-api-starter-kit --no-node
-composer create-project rasmuspjustesen/laravel-api-starter-kit my-api
+composer create-project rasmuspjustesen/laravel-api-starter-kit my-api 0.1.0-beta.1
 ```
+
+The Laravel installer integration is also supported; use a version constraint that permits the beta until a stable version is published.
 
 The Laravel installer invokes the project's post-create hook. Direct Composer installation invokes the equivalent setup script. Non-interactive installation defaults to both authentication methods and no teams.
 

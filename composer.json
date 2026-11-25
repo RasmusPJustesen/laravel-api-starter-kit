@@ -13,7 +13,8 @@
         "dedoc/scramble": "^0.13.35",
         "laravel/framework": "^13.17",
         "laravel/sanctum": "^4.3",
-        "laravel/tinker": "^3.0"
+        "laravel/tinker": "^3.0",
+        "laravel/fortify": "^1.30"
     },
     "require-dev": {
         "fakerphp/faker": "^1.24",
@@ -78,11 +79,14 @@
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi",
-            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
-            "@php artisan migrate --graceful --ansi"
+            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\""
         ],
         "pre-package-uninstall": [
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ],
+        "api:generate": [
+            "@php artisan scramble:export --path=generated/openapi.json",
+            "npm run api:types"
         ]
     },
     "extra": {

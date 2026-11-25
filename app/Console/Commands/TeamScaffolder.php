@@ -25,6 +25,10 @@ final class TeamScaffolder
 
         $map = [
             'Teams' => Str::studly($plural),
+            'teamMembers' => Str::camel($singular).'Members',
+            'teamMemberships' => Str::camel($singular).'Memberships',
+            'teamRole' => Str::camel($singular).'Role',
+            'teamName' => Str::camel($singular).'Name',
             'Team' => Str::studly($singular),
             'teams' => $plural,
             'team' => $singular,
@@ -71,6 +75,17 @@ final class TeamScaffolder
             throw new InvalidArgumentException('Application provider has been modified.');
         }
 
+        $profilePath = app_path('Http/Controllers/Auth/ProfileController.php');
+        $profile = File::get($profilePath);
+        $guard = '        $user = $request->user();'."\n\n".'        DB::transaction(function () use ($user): void {';
+        $replacement = '        $user = $request->user();'."\n\n".'        DB::transaction(function () use ($user): void {'."\n".
+            '            abort_if($user->owned'.$models.'()->where(\'is_personal\', false)->exists(), 409, __(\'Transfer ownership before deleting your account.\'));'."\n".
+            '            $user->owned'.$models.'()->where(\'is_personal\', true)->get()->each(fn ($entity) => $entity->delete());';
+        $newProfile = str_replace($guard, $replacement, $profile, $count);
+        if ($count !== 1) {
+            throw new InvalidArgumentException('Profile controller has been modified.');
+        }
+
         $apiPath = base_path('routes/api.php');
         $api = File::get($apiPath);
         $consolePath = base_path('routes/console.php');
@@ -85,6 +100,7 @@ final class TeamScaffolder
             File::put(base_path($path), $content);
         }
 
+        File::put($profilePath, $newProfile);
         File::put($userPath, $modified);
         File::put($providerPath, $newProvider);
         File::put($apiPath, rtrim($api)."\n\nrequire __DIR__.'/".$route.".php';\n");

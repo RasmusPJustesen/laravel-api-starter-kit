@@ -70,3 +70,5 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('throttle:6,1')
         ->name('verification.send');
 });
+
+require __DIR__.'/readiness.php';

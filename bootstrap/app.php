@@ -17,10 +17,11 @@ return Application::configure(basePath: dirname(__DIR__))
         if (config('starter-kit.authentication') !== 'stateless') {
             $middleware->statefulApi();
         }
+        $middleware->api(append: [\App\Http\Middleware\ResolveLocale::class]);
         $middleware->alias(['password.confirmed' => \App\Http\Middleware\RequirePasswordConfirmation::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->respond(fn (\Symfony\Component\HttpFoundation\Response $response, \Throwable $exception) => \App\Support\ApiErrors::render($exception, $response));
     })
     ->prefersJsonResponses()
     ->create();

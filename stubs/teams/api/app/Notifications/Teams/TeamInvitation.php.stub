@@ -65,11 +65,8 @@ class TeamInvitation extends Notification implements ShouldQueue
 
     private function loginUrl(): string
     {
-        return sprintf(
-            '%s/%s?%s',
-            rtrim(config()->string('services.ui.base_url'), '/'),
-            trim(config()->string('services.ui.login_path'), '/'),
-            http_build_query(['invitation' => $this->invitation->code]),
-        );
+        $client = config('frontends.clients.'.config('frontends.default'));
+
+        return rtrim($client['url'], '/').'/'.ltrim($client['login_path'] ?? '/login', '/').'?'.http_build_query(['invitation' => $this->invitation->code]);
     }
 }

@@ -19,6 +19,8 @@ class AcceptTeamInvitationController extends Controller
         $user = $request->user();
 
         DB::transaction(function () use ($user, $invitation) {
+            $invitation = TeamInvitation::query()->lockForUpdate()->findOrFail($invitation->getKey());
+            abort_unless($invitation->isPending() && $user->hasVerifiedEmail() && strcasecmp($user->email, $invitation->email) === 0, 422);
             $invitation->team->memberships()->firstOrCreate(
                 ['user_id' => $user->id],
                 ['role' => $invitation->role],

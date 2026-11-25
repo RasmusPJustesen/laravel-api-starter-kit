@@ -48,9 +48,9 @@ class TeamController extends Controller
             ->additional([
                 'meta' => [
                     'members' => MemberResource::collection($team->members()->get()),
-                    'invitations' => TeamInvitationResource::collection(
+                    'invitations' => $user->can('inviteMember', $team) ? TeamInvitationResource::collection(
                         $team->invitations()->whereNull('accepted_at')->get(),
-                    ),
+                    ) : [],
                     'permissions' => $user->toTeamPermissions($team),
                     'available_roles' => TeamRole::assignable(),
                 ],
@@ -58,7 +58,7 @@ class TeamController extends Controller
             ->response($request);
     }
 
-    #[Endpoint(title: 'Update a team', description: 'Update the team name. Only owners may update a team.')]
+    #[Endpoint(title: 'Update a team', description: 'Update the team name. Owners and admins may update a team.')]
     public function update(SaveTeamRequest $request, Team $team): JsonResponse
     {
         Gate::authorize('update', $team);

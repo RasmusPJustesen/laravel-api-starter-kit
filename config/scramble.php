@@ -30,7 +30,7 @@ return [
     /*
      * The path where your OpenAPI specification will be exported.
      */
-    'export_path' => 'api.json',
+    'export_path' => 'generated/openapi.json',
 
     /*
      * Cache configuration for the generated OpenAPI document.
@@ -76,7 +76,7 @@ return [
             'cdn' => 'https://cdn.jsdelivr.net/npm/@scalar/api-reference',
             'theme' => 'laravel',
             'url' => '/docs/api.json',
-            'proxyUrl' => 'https://proxy.scalar.com',
+            'proxyUrl' => null,
             'darkMode' => false,
             'showDeveloperTools' => 'never',
             'agent' => ['disabled' => true],

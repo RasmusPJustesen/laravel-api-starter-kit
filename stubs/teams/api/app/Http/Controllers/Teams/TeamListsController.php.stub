@@ -1,0 +1,34 @@
+<?php
+
+namespace App\Http\Controllers\Teams;
+
+use App\Http\Controllers\Controller;
+use App\Http\Resources\MemberResource;
+use App\Http\Resources\TeamInvitationResource;
+use App\Models\Team;
+use App\Models\TeamInvitation;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+
+class TeamListsController extends Controller
+{
+    public function members(Team $team)
+    {
+        return MemberResource::collection($team->members()->paginate());
+    }
+
+    public function invitations(Team $team)
+    {
+        Gate::authorize('inviteMember', $team);
+
+        return TeamInvitationResource::collection($team->invitations()->whereNull('accepted_at')->paginate());
+    }
+
+    public function mine(Request $request)
+    {
+        return TeamInvitationResource::collection(TeamInvitation::query()
+            ->whereRaw('lower(email) = ?', [strtolower($request->user()->email)])
+            ->whereNull('accepted_at')->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->paginate());
+    }
+}

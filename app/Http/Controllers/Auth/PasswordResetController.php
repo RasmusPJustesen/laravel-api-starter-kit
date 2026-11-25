@@ -30,14 +30,7 @@ class PasswordResetController extends Controller
                     'password' => $password,
                     'remember_token' => Str::random(60),
                 ])->save();
-                $user->tokens()->delete();
-
-                if (config('session.driver') === 'database') {
-                    DB::connection(config('session.connection'))
-                        ->table(config('session.table'))
-                        ->where('user_id', $user->getKey())
-                        ->delete();
-                }
+                \App\Support\Auth\Credentials::revokeAll($user);
             });
 
             event(new PasswordReset($user));

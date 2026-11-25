@@ -47,7 +47,9 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('user/two-factor-recovery-codes', [\App\Http\Controllers\Auth\TwoFactorController::class, 'regenerate']);
         });
     }
-    Route::post('token/refresh', RefreshTokenController::class)->name('token.refresh');
+    if (in_array(config('starter-kit.authentication'), ['stateless', 'both'], true)) {
+        Route::post('token/refresh', RefreshTokenController::class)->name('token.refresh');
+    }
 
     Route::get('user/sessions', [\App\Http\Controllers\Auth\SessionController::class, 'index']);
     Route::middleware('password.confirmed')->group(function (): void {

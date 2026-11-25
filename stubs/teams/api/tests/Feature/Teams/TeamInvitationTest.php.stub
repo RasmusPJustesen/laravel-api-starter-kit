@@ -151,8 +151,8 @@ class TeamInvitationTest extends TestCase
     {
         Notification::fake();
         config([
-            'services.ui.base_url' => 'https://ui.example.com',
-            'services.ui.login_path' => 'sign-in',
+            'frontends.clients.web.url' => 'https://ui.example.com',
+            'frontends.clients.web.login_path' => 'sign-in',
         ]);
 
         $owner = User::factory()->create();

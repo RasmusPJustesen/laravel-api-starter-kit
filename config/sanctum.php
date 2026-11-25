@@ -18,7 +18,7 @@ return [
     |
     */
 
-    'stateful' => explode(',', (string) env('SANCTUM_STATEFUL_DOMAINS', sprintf(
+    'stateful' => env('STARTER_KIT_AUTH', 'both') === 'stateless' ? [] : explode(',', (string) env('SANCTUM_STATEFUL_DOMAINS', sprintf(
         '%s%s',
         'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
         Sanctum::currentApplicationUrlWithPort(),
@@ -37,7 +37,7 @@ return [
     |
     */
 
-    'guard' => ['web'],
+    'guard' => env('STARTER_KIT_AUTH', 'both') === 'stateless' ? [] : ['web'],
 
     /*
     |--------------------------------------------------------------------------

@@ -14,9 +14,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->redirectGuestsTo(fn () => null);
-        if (config('starter-kit.authentication') !== 'stateless') {
-            $middleware->statefulApi();
-        }
+        // Middleware configuration runs before the config repository is loaded.
+        // Sanctum's configured stateful domains decide whether to start a session.
+        $middleware->statefulApi();
         $middleware->api(append: [\App\Http\Middleware\ResolveLocale::class]);
         $middleware->alias(['password.confirmed' => \App\Http\Middleware\RequirePasswordConfirmation::class]);
     })

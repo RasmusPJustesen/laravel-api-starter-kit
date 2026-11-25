@@ -1,0 +1,78 @@
+<?php
+
+namespace App\Providers;
+
+use App\Support\FrontendClients;
+use Carbon\CarbonImmutable;
+use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Foundation\DevCommands;
+use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
+
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     */
+    public function register(): void
+    {
+        \Laravel\Fortify\Fortify::ignoreRoutes();
+    }
+
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(): void
+    {
+        $this->configureDefaults();
+
+        \Illuminate\Support\Facades\Event::listen(\App\Events\AccountSecurityChanged::class, function (\App\Events\AccountSecurityChanged $event): void {
+            \Illuminate\Support\Facades\Log::info('account.security.changed', ['user_id' => $event->user->getKey(), 'action' => $event->action]);
+            if (config('starter-kit.security_notifications')) {
+                try {
+                    \Illuminate\Support\Facades\Notification::route('mail', $event->recipient ?? $event->user->email)
+                        ->notify(new \App\Notifications\AccountSecurityNotification($event->action));
+                } catch (\Throwable $exception) {
+                    report($exception);
+                }
+            }
+        });
+
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\PasswordReset::class, function ($event): void {
+            \App\Support\Auth\SecurityEvents::dispatch($event->user, 'Password reset');
+        });
+
+        ResetPassword::createUrlUsing(function ($user, string $token): string {
+            return FrontendClients::url(request(), 'password_reset_path', [
+                'token' => $token,
+                'email' => $user->getEmailForPasswordReset(),
+            ]);
+        });
+
+        DevCommands::except('vite');
+    }
+
+    /**
+     * Configure default behaviors for production-ready applications.
+     */
+    protected function configureDefaults(): void
+    {
+        Date::use(CarbonImmutable::class);
+
+        DB::prohibitDestructiveCommands(
+            app()->isProduction(),
+        );
+
+        Password::defaults(fn (): ?Password => app()->isProduction()
+            ? Password::min(12)
+                ->mixedCase()
+                ->letters()
+                ->numbers()
+                ->symbols()
+                ->uncompromised()
+            : null,
+        );
+    }
+}

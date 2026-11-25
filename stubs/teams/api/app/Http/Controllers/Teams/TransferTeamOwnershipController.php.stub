@@ -1,0 +1,29 @@
+<?php
+
+namespace App\Http\Controllers\Teams;
+
+use App\Enums\TeamRole;
+use App\Http\Controllers\Controller;
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class TransferTeamOwnershipController extends Controller
+{
+    public function __invoke(Request $request, Team $team, User $user)
+    {
+        DB::transaction(function () use ($request, $team, $user): void {
+            $team = Team::query()->lockForUpdate()->findOrFail($team->getKey());
+            abort_unless($request->user()->ownsTeam($team) && ! $team->is_personal, 403);
+            abort_if($request->user()->is($user), 422);
+            $target = $team->memberships()->where('user_id', $user->getKey())->firstOrFail();
+            $owner = $team->memberships()->where('user_id', $request->user()->getKey())->firstOrFail();
+            $owner->update(['role' => TeamRole::Admin]);
+            $target->update(['role' => TeamRole::Owner]);
+            DB::afterCommit(fn () => event(new \App\Events\Teams\TeamOwnershipTransferred($team, $user)));
+        });
+
+        return response()->noContent();
+    }
+}

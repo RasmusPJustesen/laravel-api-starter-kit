@@ -1,0 +1,10 @@
+{
+    "private": true,
+    "scripts": {
+        "api:types": "openapi-typescript generated/openapi.json -o generated/api.d.ts"
+    },
+    "devDependencies": {
+        "openapi-typescript": "^7.0.0",
+        "typescript": "^5.9.0"
+    }
+}

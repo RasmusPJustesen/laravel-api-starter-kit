@@ -1,0 +1,46 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [base, team, organization]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+          extensions: pdo_sqlite
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: composer validate --no-check-lock
+      - run: composer install --no-interaction --prefer-dist
+      - run: cp .env.example .env && php artisan key:generate
+      - run: |
+          if [ "$VARIANT" = base ]; then
+            php artisan starter-kit:install --no-teams --auth=both --no-interaction
+          else
+            php artisan starter-kit:install --teams --team-name="$VARIANT" --auth=both --no-interaction
+          fi
+        env:
+          VARIANT: ${{ matrix.variant }}
+      - run: php artisan test
+      - run: php artisan config:cache && php artisan route:cache && php artisan optimize:clear
+      - run: npm install --ignore-scripts
+      - run: composer api:generate
+      - run: npx tsc --noEmit generated/api.d.ts
+      - run: composer audit

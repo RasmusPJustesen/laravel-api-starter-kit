@@ -1,0 +1,49 @@
+<?php
+
+namespace App\Support\Auth;
+
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Laravel\Sanctum\PersonalAccessToken;
+
+final class Credentials
+{
+    public static function sessions()
+    {
+        return DB::connection(config('session.connection'))->table(config('session.table', 'sessions'));
+    }
+
+    public static function revokeOthers(Request $request, User $user): void
+    {
+        $current = $request->user()->currentAccessToken();
+        $tokens = $user->tokens();
+
+        if ($current instanceof PersonalAccessToken) {
+            $tokens->whereKeyNot($current->getKey());
+        }
+
+        $tokens->delete();
+
+        if (config('session.driver') === 'database') {
+            $sessions = self::sessions()->where('user_id', $user->getKey());
+            if (! ($current instanceof PersonalAccessToken) && $request->hasSession()) {
+                $sessions->where('id', '!=', $request->session()->getId());
+            }
+            $sessions->delete();
+        }
+
+        $user->forceFill(['remember_token' => Str::random(60)])->save();
+    }
+
+    public static function revokeAll(User $user): void
+    {
+        $user->tokens()->delete();
+        if (config('session.driver') === 'database') {
+            self::sessions()->where('user_id', $user->getKey())->delete();
+        }
+        DB::table('authentication_challenges')->where('user_id', $user->getKey())->delete();
+        $user->forceFill(['remember_token' => Str::random(60)])->save();
+    }
+}

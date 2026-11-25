@@ -1,5 +1,30 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import Ajv2020 from 'ajv/dist/2020.js'
+
+const specification = JSON.parse(readFileSync(new URL('../generated/openapi.json', import.meta.url), 'utf8'))
+const ajv = new Ajv2020({ strict: false, validateFormats: false })
+function validateContract(path, method, status, data, contentType) {
+    const template = Object.keys(specification.paths).find(candidate => {
+        const segments = candidate.split('/')
+        const actual = path.split('/')
+        return segments.length === actual.length && segments.every((segment, i) => segment.startsWith('{') || segment === actual[i])
+    })
+    if (!template && status === 404) return // disabled endpoints are intentionally absent
+    assert.ok(template, 'Missing OpenAPI path: ' + path)
+    const operation = specification.paths[template][method.toLowerCase()]
+    assert.ok(operation, 'Missing operation: ' + method + ' ' + template)
+    if (status === 204) { assert.ok(operation.responses[204], 'Missing 204 response: ' + template); return }
+    const response = operation.responses[status]
+    assert.ok(response, 'Undocumented status: ' + status + ' ' + template)
+    const type = contentType?.split(';')[0]
+    const resolved = response.$ref ? response.$ref.slice(2).split('/').reduce((node, key) => node[key], specification) : response
+    const schema = resolved.content?.[type]?.schema ?? resolved.content?.['application/json']?.schema ?? resolved.content?.['application/vnd.api+json']?.schema
+    assert.ok(schema, 'Missing response schema: ' + template + ' ' + status)
+    const validate = ajv.compile({ ...schema, components: specification.components })
+    assert.ok(validate(data), 'Response violates contract: ' + method + ' ' + template + ' ' + JSON.stringify(validate.errors))
+}
 
 const api = process.env.SMOKE_API_URL ?? 'http://127.0.0.1:8000'
 const origin = process.env.FRONTEND_WEB_ORIGIN ?? 'http://127.0.0.1:3000'
@@ -37,7 +62,9 @@ async function request(path, { method = 'GET', body, token, browser, csrf = true
     }
     const raw = await response.text()
     assert.equal(response.status, expected, method + ' ' + path + ': ' + raw.slice(0, 1000))
-    return raw ? JSON.parse(raw) : null
+    const data = raw ? JSON.parse(raw) : null
+    validateContract(path, method, expected, data, response.headers.get('content-type'))
+    return data
 }
 
 const credentials = { email, password }

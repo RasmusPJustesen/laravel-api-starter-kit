@@ -76,6 +76,9 @@ final class ApiContract
             'client_id' => (new StringType)->nullable(true),
             'ip_address' => (new StringType)->nullable(true),
             'user_agent' => (new StringType)->nullable(true),
+            'device' => (new StringType)->nullable(true),
+            'browser' => (new StringType)->nullable(true),
+            'platform' => (new StringType)->nullable(true),
             'last_active_at' => (new StringType)->format('date-time')->nullable(true),
             'is_current' => new BooleanType,
         ]);

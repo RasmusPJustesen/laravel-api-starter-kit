@@ -36,8 +36,8 @@ class AppServiceProvider extends ServiceProvider
             \Illuminate\Support\Facades\RateLimiter::for('starter-'.$name, function (\Illuminate\Http\Request $request) use ($name, $attempts) {
                 $limits = [\Illuminate\Cache\RateLimiting\Limit::perMinute(max(1, $attempts))->by('ip:'.$request->ip())];
                 if ($name === 'authentication') {
-                    $key = (string) ($request->input('challenge_token') ?: $request->input('email', ''));
-                    if ($key !== '') {
+                    $key = $request->input('challenge_token') ?: $request->input('email', '');
+                    if (is_string($key) && $key !== '') {
                         $limits[] = \Illuminate\Cache\RateLimiting\Limit::perMinute(max(1, $attempts))->by('credential:'.hash('sha256', strtolower($key)));
                     }
                 }

@@ -77,7 +77,7 @@ class SessionController extends Controller
 
     public function index(Request $request)
     {
-        return response()->json(['data' => array_map(fn ($item) => ['type' => 'sessions', 'id' => $item['data']['id'], 'attributes' => array_diff_key($item['data'], ['id' => true])], $this->records($request))]);
+        return response()->json(['data' => array_map(fn ($item) => ['type' => 'sessions', 'id' => $item['data']['id'], 'attributes' => array_diff_key($item['data'], ['id' => true]) + \App\Support\Auth\UserAgent::describe($item['data']['user_agent'])], $this->records($request))]);
     }
 
     public function destroy(Request $request, string $session)

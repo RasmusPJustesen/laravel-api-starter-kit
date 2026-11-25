@@ -40,14 +40,14 @@ Route::middleware(['auth:sanctum', 'two-factor.required'])->group(function () {
 
     if (config('starter-kit.two_factor') || config('starter-kit.require_two_factor')) {
         Route::get('user/two-factor-authentication', [\App\Http\Controllers\Auth\TwoFactorController::class, 'show']);
-        Route::middleware(['password.confirmed', 'throttle:5,1'])->group(function (): void {
-            Route::post('user/two-factor-authentication', [\App\Http\Controllers\Auth\TwoFactorController::class, 'store']);
-            Route::delete('user/two-factor-authentication', [\App\Http\Controllers\Auth\TwoFactorController::class, 'destroy']);
-            Route::get('user/two-factor-secret-key', [\App\Http\Controllers\Auth\TwoFactorController::class, 'setup']);
-            Route::get('user/two-factor-qr-code', [\App\Http\Controllers\Auth\TwoFactorController::class, 'qrCode']);
-            Route::post('user/confirmed-two-factor-authentication', [\App\Http\Controllers\Auth\TwoFactorController::class, 'confirm']);
-            Route::get('user/two-factor-recovery-codes', [\App\Http\Controllers\Auth\TwoFactorController::class, 'recoveryCodes']);
-            Route::post('user/two-factor-recovery-codes', [\App\Http\Controllers\Auth\TwoFactorController::class, 'regenerate']);
+        Route::middleware('password.confirmed')->group(function (): void {
+            Route::post('user/two-factor-authentication', [\App\Http\Controllers\Auth\TwoFactorController::class, 'store'])->middleware('throttle:starter-sensitive');
+            Route::delete('user/two-factor-authentication', [\App\Http\Controllers\Auth\TwoFactorController::class, 'destroy'])->middleware('throttle:starter-sensitive');
+            Route::get('user/two-factor-secret-key', [\App\Http\Controllers\Auth\TwoFactorController::class, 'setup'])->middleware('throttle:starter-sensitive-read');
+            Route::get('user/two-factor-qr-code', [\App\Http\Controllers\Auth\TwoFactorController::class, 'qrCode'])->middleware('throttle:starter-sensitive-read');
+            Route::post('user/confirmed-two-factor-authentication', [\App\Http\Controllers\Auth\TwoFactorController::class, 'confirm'])->middleware('throttle:starter-sensitive');
+            Route::get('user/two-factor-recovery-codes', [\App\Http\Controllers\Auth\TwoFactorController::class, 'recoveryCodes'])->middleware('throttle:starter-sensitive-read');
+            Route::post('user/two-factor-recovery-codes', [\App\Http\Controllers\Auth\TwoFactorController::class, 'regenerate'])->middleware('throttle:starter-sensitive');
         });
     }
     if (in_array(config('starter-kit.authentication'), ['stateless', 'both'], true)) {

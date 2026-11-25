@@ -57,7 +57,15 @@ jobs:
           php artisan migrate --force
       - if: ${{ !cancelled() && steps.schema.outcome == 'success' }}
         run: php artisan config:cache && php artisan route:cache && php artisan optimize:clear
-      - if: ${{ !cancelled() && steps.schema.outcome == 'success' && matrix.variant == 'base' }}
+      - id: node_dependencies
+        if: ${{ !cancelled() && steps.configure.outcome == 'success' }}
+        run: npm install --ignore-scripts
+      - id: api_contract
+        if: ${{ !cancelled() && steps.node_dependencies.outcome == 'success' && steps.schema.outcome == 'success' }}
+        run: composer api:generate
+      - if: ${{ !cancelled() && steps.api_contract.outcome == 'success' }}
+        run: npx tsc --noEmit generated/api.d.ts
+      - if: ${{ !cancelled() && steps.api_contract.outcome == 'success' && matrix.variant == 'base' }}
         name: HTTP authentication smoke test
         env:
           APP_URL: http://127.0.0.1:8000
@@ -75,13 +83,5 @@ jobs:
             sleep 1
           done
           node scripts/http-smoke.mjs
-      - id: node_dependencies
-        if: ${{ !cancelled() && steps.configure.outcome == 'success' }}
-        run: npm install --ignore-scripts
-      - id: api_contract
-        if: ${{ !cancelled() && steps.node_dependencies.outcome == 'success' && steps.schema.outcome == 'success' }}
-        run: composer api:generate
-      - if: ${{ !cancelled() && steps.api_contract.outcome == 'success' }}
-        run: npx tsc --noEmit generated/api.d.ts
       - if: ${{ !cancelled() && steps.configure.outcome == 'success' }}
         run: composer audit

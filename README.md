@@ -43,7 +43,7 @@ Configure trusted first-party origins and SANCTUM_STATEFUL_DOMAINS, SESSION_DOMA
 
 ### API documentation and types
 
-Visit /docs locally. OpenAPI is available at /docs/api.json. Generate a contract with:
+Visit /docs locally. OpenAPI is available at /docs/api.json. Scramble infers JSON:API resource attributes from the database schema, so create the configured database and run migrations before exporting. Generate a contract with:
 
 ```sh
 npm install

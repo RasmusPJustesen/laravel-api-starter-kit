@@ -42,11 +42,16 @@ jobs:
       - run: php artisan test
       - if: ${{ !cancelled() && steps.configure.outcome == 'success' }}
         run: php artisan config:cache && php artisan route:cache && php artisan optimize:clear
+      - id: schema
+        if: ${{ !cancelled() && steps.configure.outcome == 'success' }}
+        run: |
+          touch database/database.sqlite
+          php artisan migrate --force
       - id: node_dependencies
         if: ${{ !cancelled() && steps.configure.outcome == 'success' }}
         run: npm install --ignore-scripts
       - id: api_contract
-        if: ${{ !cancelled() && steps.node_dependencies.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.node_dependencies.outcome == 'success' && steps.schema.outcome == 'success' }}
         run: composer api:generate
       - if: ${{ !cancelled() && steps.api_contract.outcome == 'success' }}
         run: npx tsc --noEmit generated/api.d.ts

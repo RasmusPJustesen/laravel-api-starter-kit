@@ -16,12 +16,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [base, team, organization]
+        include:
+          - variant: base
+            php: '8.3'
+          - variant: team
+            php: '8.4'
+          - variant: organization
+            php: '8.5'
+          - variant: company
+            php: '8.4'
+          - variant: study_group
+            php: '8.4'
     steps:
       - uses: actions/checkout@v6
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
+          php-version: ${{ matrix.php }}
           tools: composer:v2
           extensions: pdo_sqlite
       - uses: actions/setup-node@v4
@@ -47,6 +57,24 @@ jobs:
           php artisan migrate --force
       - if: ${{ !cancelled() && steps.schema.outcome == 'success' }}
         run: php artisan config:cache && php artisan route:cache && php artisan optimize:clear
+      - if: ${{ !cancelled() && steps.schema.outcome == 'success' && matrix.variant == 'base' }}
+        name: HTTP authentication smoke test
+        env:
+          APP_URL: http://127.0.0.1:8000
+          FRONTEND_WEB_URL: http://127.0.0.1:3000
+          FRONTEND_WEB_ORIGIN: http://127.0.0.1:3000
+          FRONTEND_MOBILE_URL: https://mobile.example.test
+          AUTH_RATE_LIMIT: 100
+          AUTH_SENSITIVE_RATE_LIMIT: 100
+        run: |
+          php artisan serve --host=127.0.0.1 --port=8000 > /tmp/starter-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; tail -n 40 /tmp/starter-server.log' EXIT
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/ready > /dev/null; then break; fi
+            sleep 1
+          done
+          node scripts/http-smoke.mjs
       - id: node_dependencies
         if: ${{ !cancelled() && steps.configure.outcome == 'success' }}
         run: npm install --ignore-scripts

@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\DevCommands;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,15 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+
+        ResetPassword::createUrlUsing(function ($user, string $token): string {
+            $client = config('frontends.clients.'.config('frontends.default'));
+
+            return rtrim($client['url'], '/').'/'.ltrim($client['password_reset_path'], '/').'?'.http_build_query([
+                'token' => $token,
+                'email' => $user->getEmailForPasswordReset(),
+            ]);
+        });
 
         DevCommands::except('vite');
     }

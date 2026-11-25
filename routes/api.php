@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\PasswordUpdateController;
 use App\Http\Controllers\Auth\ProfileController;
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('throttle:5,1')->group(function () {
     Route::post('register', RegisterController::class)->name('register');
     Route::post('login', LoginController::class)->name('login');
+    Route::post('forgot-password', [PasswordResetController::class, 'store'])->name('password.email');
+    Route::post('reset-password', [PasswordResetController::class, 'update'])->name('password.reset.submit');
 });
 
 Route::get('email/verify/{id}/{hash}', VerifyEmailController::class)

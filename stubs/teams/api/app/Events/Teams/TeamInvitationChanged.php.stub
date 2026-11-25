@@ -1,0 +1,10 @@
+<?php
+
+namespace App\Events\Teams;
+
+use App\Models\TeamInvitation;
+
+final readonly class TeamInvitationChanged
+{
+    public function __construct(public TeamInvitation $invitation, public string $action) {}
+}

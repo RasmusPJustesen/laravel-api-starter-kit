@@ -31,6 +31,7 @@ class TeamMemberController extends Controller
             Gate::authorize('updateMember', $team);
             abort_if($team->owner()?->is($user), 403);
             $team->memberships()->where('user_id', $user->id)->firstOrFail()->update(['role' => $newRole]);
+            \Illuminate\Support\Facades\DB::afterCommit(fn () => event(new \App\Events\Teams\TeamLifecycleChanged($team, 'role_changed', $user)));
         });
 
         $member = $team->members()->where('users.id', $user->id)->firstOrFail();

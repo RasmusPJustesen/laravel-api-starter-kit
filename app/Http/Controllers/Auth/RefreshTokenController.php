@@ -20,7 +20,7 @@ class RefreshTokenController extends Controller
     {
         $user = $request->user();
 
-        /** @var PersonalAccessToken|\Laravel\Sanctum\TransientToken|null $3 */
+        /** @var PersonalAccessToken|\Laravel\Sanctum\TransientToken|null $current */
         $current = $user->currentAccessToken();
         abort_unless($current instanceof PersonalAccessToken, 403);
         $token = DB::transaction(function () use ($request, $user, $current): string {

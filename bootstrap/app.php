@@ -26,8 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Sanctum's configured stateful domains decide whether to start a session.
         $middleware->statefulApi();
         $middleware->api(append: [RestoreBrowserDevice::class]);
-        $middleware->api(append: [ResolveLocale::class]);
-        $middleware->web(append: [ResolveLocale::class]);
+        $middleware->prepend(ResolveLocale::class);
         $middleware->appendToPriorityList(StartSession::class, RestoreBrowserDevice::class);
         $middleware->web(append: [RestoreBrowserDevice::class]);
         $middleware->alias([

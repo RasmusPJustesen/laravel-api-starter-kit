@@ -17,7 +17,7 @@ final class Credentials
 
     public static function revokeOthers(Request $request, User $user): void
     {
-        /** @var PersonalAccessToken|\Laravel\Sanctum\TransientToken|null $3 */
+        /** @var PersonalAccessToken|\Laravel\Sanctum\TransientToken|null $current */
         $current = $request->user()->currentAccessToken();
         $tokens = $user->tokens();
 

@@ -13,7 +13,11 @@ class ResolveLocale
         $previous = App::currentLocale();
         App::setLocale($request->getPreferredLanguage(config('starter-kit.locales', ['en'])) ?: config('app.locale'));
         try {
-            return $next($request);
+            $response = $next($request);
+            $response->headers->set('Content-Language', App::currentLocale());
+            $response->setVary('Accept-Language', false);
+
+            return $response;
         } finally {
             App::setLocale($previous);
         }

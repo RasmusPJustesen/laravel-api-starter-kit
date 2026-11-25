@@ -17,7 +17,7 @@ class LogoutController extends Controller
     #[Endpoint(title: 'Logout', description: 'Revoke the current API token.')]
     public function __invoke(Request $request): Response
     {
-        /** @var PersonalAccessToken|\Laravel\Sanctum\TransientToken|null $3 */
+        /** @var PersonalAccessToken|\Laravel\Sanctum\TransientToken|null $token */
         $token = $request->user()->currentAccessToken();
 
         if ($token instanceof PersonalAccessToken) {

@@ -28,6 +28,7 @@ class AcceptTeamInvitationController extends Controller
             );
 
             $invitation->update(['accepted_at' => now()]);
+            DB::afterCommit(fn () => event(new \App\Events\Teams\TeamInvitationChanged($invitation, 'accepted')));
             if ($membership->wasRecentlyCreated) {
                 DB::afterCommit(fn () => event(new \App\Events\Teams\TeamLifecycleChanged($team, 'member_added', $user)));
             }

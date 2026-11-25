@@ -24,7 +24,7 @@ class SessionController extends Controller
     private function records(Request $request): array
     {
         $user = $request->user();
-        /** @var PersonalAccessToken|\Laravel\Sanctum\TransientToken|null $3 */
+        /** @var PersonalAccessToken|\Laravel\Sanctum\TransientToken|null $current */
         $current = $user->currentAccessToken();
         $items = [];
         $tokens = $user->tokens()->get();
@@ -92,7 +92,7 @@ class SessionController extends Controller
         abort_unless($record !== null, 404);
         abort_if($record['data']['is_current'], 409, __('Use logout to end the current session.'));
 
-        DB::transaction(function () use ($request, $record): void {
+        DB::transaction(function () use ($request, $record, $session): void {
             $user = User::query()->lockForUpdate()->whereKey($request->user()->getKey())->firstOrFail();
             if ($record['kind'] === 'token') {
                 $query = $user->tokens();
@@ -113,6 +113,7 @@ class SessionController extends Controller
                 Credentials::sessions()->where('user_id', $request->user()->getKey())->where('id', $record['key'])->delete();
                 $request->user()->forceFill(['remember_token' => Str::random(60)])->save();
             }
+            DB::afterCommit(fn () => event(new \App\Events\DeviceSessionsRevoked($user, 'single', $session)));
         });
 
         return response()->noContent();
@@ -123,6 +124,7 @@ class SessionController extends Controller
         DB::transaction(function () use ($request): void {
             $user = User::query()->lockForUpdate()->whereKey($request->user()->getKey())->firstOrFail();
             Credentials::revokeOthers($request, $user);
+            DB::afterCommit(fn () => event(new \App\Events\DeviceSessionsRevoked($user, 'others')));
         });
 
         return response()->noContent();

@@ -65,7 +65,7 @@ class AppServiceProvider extends ServiceProvider
             if (config('starter-kit.security_notifications')) {
                 try {
                     Notification::route('mail', $event->recipient ?? $event->user->email)
-                        ->notify(new AccountSecurityNotification($event->action));
+                        ->notify((new AccountSecurityNotification($event->action))->locale(app()->getLocale()));
                 } catch (\Throwable $exception) {
                     report($exception);
                 }

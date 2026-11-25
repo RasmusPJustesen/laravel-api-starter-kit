@@ -216,3 +216,12 @@ jobs:
           php artisan migrate --force
           php artisan tinker --execute='if (! App\Models\User::where("email", "existing@example.test")->firstOrFail()->personalWorkspace()) { throw new RuntimeException("Personal workspace not provisioned"); }'
           php artisan test
+      - name: Verify Laravel installer hooks
+        run: |
+          composer global require laravel/installer --no-interaction
+          composer config --global repositories.starter '{"type":"path","url":"/tmp/starter-source","options":{"symlink":false,"versions":{"rasmuspjustesen/laravel-api-starter-kit":"dev-main"}}}'
+          "$(composer global config bin-dir --absolute)/laravel" new /tmp/starter-laravel-app --using=rasmuspjustesen/laravel-api-starter-kit --no-interaction --no-node --no-boost --phpunit --database=sqlite
+          cd /tmp/starter-laravel-app
+          test -f .starter-kit-installed
+          php artisan migrate:status
+          php artisan test

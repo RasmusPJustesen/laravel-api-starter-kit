@@ -16,6 +16,7 @@ class DeclineTeamInvitationController extends Controller
     public function __invoke(AcceptTeamInvitationRequest $request, TeamInvitation $invitation): MessageResponse
     {
         $invitation->delete();
+        event(new \App\Events\Teams\TeamInvitationChanged($invitation, 'declined'));
 
         return new MessageResponse('Invitation declined successfully.');
     }

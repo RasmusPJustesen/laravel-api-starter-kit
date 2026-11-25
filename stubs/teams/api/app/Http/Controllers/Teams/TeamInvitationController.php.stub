@@ -32,7 +32,9 @@ class TeamInvitationController extends Controller
         ]);
 
         Notification::route('mail', $invitation->email)
-            ->notify(new TeamInvitationNotification($invitation, \App\Support\FrontendClients::resolve($request)['id']));
+            ->notify((new TeamInvitationNotification($invitation, \App\Support\FrontendClients::resolve($request)['id']))->locale(app()->getLocale()));
+
+        event(new \App\Events\Teams\TeamInvitationChanged($invitation, 'created'));
 
         return (new TeamInvitationResource($invitation))
             ->response($request)
@@ -47,6 +49,7 @@ class TeamInvitationController extends Controller
         Gate::authorize('cancelInvitation', $team);
 
         $invitation->delete();
+        event(new \App\Events\Teams\TeamInvitationChanged($invitation, 'cancelled'));
 
         return response()->noContent();
     }

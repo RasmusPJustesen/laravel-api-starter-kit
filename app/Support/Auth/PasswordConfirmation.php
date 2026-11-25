@@ -11,7 +11,7 @@ final class PasswordConfirmation
     private static function key(Request $request): string
     {
         $user = $request->user();
-        /** @var PersonalAccessToken|\Laravel\Sanctum\TransientToken|null $3 */
+        /** @var PersonalAccessToken|\Laravel\Sanctum\TransientToken|null $token */
         $token = $user->currentAccessToken();
         $id = $token instanceof PersonalAccessToken ? 'token:'.$token->getKey() : 'session:'.$request->session()->getId();
 

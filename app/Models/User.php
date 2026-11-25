@@ -18,6 +18,13 @@ class User extends Authenticatable implements MustVerifyEmail
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
+    public function sendEmailVerificationNotification(): void
+    {
+        if (config('starter-kit.email_verification')) {
+            parent::sendEmailVerificationNotification();
+        }
+    }
+
     /**
      * Get the attributes that should be cast.
      *

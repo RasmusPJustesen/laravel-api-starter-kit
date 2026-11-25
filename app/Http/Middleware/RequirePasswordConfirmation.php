@@ -11,7 +11,7 @@ class RequirePasswordConfirmation
     public function handle(Request $request, Closure $next)
     {
         if (! PasswordConfirmation::confirmed($request)) {
-            return response()->json(['errors' => [['status' => '403', 'code' => 'PASSWORD_CONFIRMATION_REQUIRED', 'detail' => __('Please confirm your password.')]]], 403);
+            return \App\Support\ApiErrors::response(403, 'PASSWORD_CONFIRMATION_REQUIRED', __('Please confirm your password.'));
         }
 
         return $next($request);

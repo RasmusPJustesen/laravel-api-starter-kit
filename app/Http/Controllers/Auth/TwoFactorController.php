@@ -47,6 +47,20 @@ class TwoFactorController extends Controller
         ])->header('Cache-Control', 'no-store');
     }
 
+    public function qrCode(Request $request, TwoFactorAuthenticationProvider $provider)
+    {
+        $user = $request->user();
+        abort_unless($user->two_factor_secret && ! TwoFactor::enabled($user), 409);
+        $url = $provider->qrCodeUrl(config('app.name'), $user->email, Crypt::decryptString($user->two_factor_secret));
+
+        $svg = (new \BaconQrCode\Writer(new \BaconQrCode\Renderer\ImageRenderer(
+            new \BaconQrCode\Renderer\RendererStyle\RendererStyle(192),
+            new \BaconQrCode\Renderer\Image\SvgImageBackEnd()
+        )))->writeString($url);
+
+        return response()->json(['svg' => $svg, 'url' => $url])->header('Cache-Control', 'no-store');
+    }
+
     public function confirm(Request $request)
     {
         $data = $request->validate(['code' => ['required', 'string', 'regex:/^\d{6}$/D']]);
@@ -93,6 +107,7 @@ class TwoFactorController extends Controller
 
     public function destroy(Request $request)
     {
+        abort_if(config('starter-kit.require_two_factor'), 403, __('Two-factor authentication is required.'));
         DB::transaction(function () use ($request): void {
             $user = User::query()->lockForUpdate()->findOrFail($request->user()->getKey());
 

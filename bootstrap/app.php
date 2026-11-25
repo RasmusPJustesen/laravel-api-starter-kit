@@ -18,7 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // Sanctum's configured stateful domains decide whether to start a session.
         $middleware->statefulApi();
         $middleware->api(append: [\App\Http\Middleware\ResolveLocale::class]);
-        $middleware->alias(['password.confirmed' => \App\Http\Middleware\RequirePasswordConfirmation::class]);
+        $middleware->web(append: [\App\Http\Middleware\ResolveLocale::class]);
+        $middleware->alias([
+            'password.confirmed' => \App\Http\Middleware\RequirePasswordConfirmation::class,
+            'verified' => \App\Http\Middleware\EnsureVerifiedEmail::class,
+            'two-factor.required' => \App\Http\Middleware\RequireTwoFactor::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->respond(fn (\Symfony\Component\HttpFoundation\Response $response, \Throwable $exception) => \App\Support\ApiErrors::render($exception, $response));

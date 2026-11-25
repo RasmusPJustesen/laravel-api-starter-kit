@@ -35,6 +35,10 @@ class ProfileController extends Controller
             return new UserResource($user);
         }
 
+        if (! \App\Support\Auth\PasswordConfirmation::confirmed($request)) {
+            abort(403, __('Please confirm your password.'), ['X-API-Error-Code' => 'PASSWORD_CONFIRMATION_REQUIRED']);
+        }
+
         $user->email_verified_at = null;
         $user->save();
         $user->sendEmailVerificationNotification();

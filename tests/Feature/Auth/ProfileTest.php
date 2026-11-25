@@ -45,6 +45,10 @@ class ProfileTest extends TestCase
         $user = User::factory()->create();
         $token = $user->createToken('auth')->plainTextToken;
 
+        $this->withToken($token)->patchJson(route('profile.update'), ['email' => 'new@example.com'])->assertForbidden()
+            ->assertJsonPath('error_details.0.code', 'PASSWORD_CONFIRMATION_REQUIRED');
+        $this->withToken($token)->postJson('/user/confirm-password', ['password' => 'password'])->assertNoContent();
+
         $response = $this->withToken($token)->patchJson(route('profile.update'), [
             'email' => 'new@example.com',
         ]);
@@ -62,6 +66,7 @@ class ProfileTest extends TestCase
         $user = User::factory()->create();
         $token = $user->createToken('auth')->plainTextToken;
 
+        $this->withToken($token)->postJson('/user/confirm-password', ['password' => 'password'])->assertNoContent();
         $this->withToken($token)->patchJson(route('profile.update'), [
             'email' => 'new@example.com',
         ])->assertOk();

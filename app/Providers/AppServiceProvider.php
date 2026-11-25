@@ -28,6 +28,15 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
 
+        \Laravel\Sanctum\Sanctum::authenticateAccessTokensUsing(
+            fn ($token, bool $valid): bool => $valid && config('starter-kit.authentication') !== 'stateful'
+        );
+        foreach (config('starter-kit.rate_limits') as $name => $attempts) {
+            \Illuminate\Support\Facades\RateLimiter::for('starter-'.$name, fn (\Illuminate\Http\Request $request) =>
+                \Illuminate\Cache\RateLimiting\Limit::perMinute(max(1, $attempts))->by($request->ip())
+            );
+        }
+
         \Illuminate\Support\Facades\Event::listen(\App\Events\AccountSecurityChanged::class, function (\App\Events\AccountSecurityChanged $event): void {
             \Illuminate\Support\Facades\Log::info('account.security.changed', ['user_id' => $event->user->getKey(), 'action' => $event->action]);
             if (config('starter-kit.security_notifications')) {

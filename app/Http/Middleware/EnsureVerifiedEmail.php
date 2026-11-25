@@ -5,10 +5,12 @@ namespace App\Http\Middleware;
 use App\Support\ApiErrors;
 use Closure;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class EnsureVerifiedEmail
 {
-    public function handle(\Illuminate\Http\Request $request, Closure $next, ?string $redirectToRoute = null): \Symfony\Component\HttpFoundation\Response|null
+    public function handle(Request $request, Closure $next, ?string $redirectToRoute = null): ?Response
     {
         if (! config('starter-kit.email_verification')) {
             return $next($request);

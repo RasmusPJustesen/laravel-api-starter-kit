@@ -4,6 +4,7 @@ namespace App\Support\Auth;
 
 use App\Models\User;
 use App\Support\FrontendClients;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
@@ -14,7 +15,7 @@ final class BrowserDevices
 {
     public const COOKIE = 'starter_device';
 
-    public static function table(): \Illuminate\Database\Query\Builder
+    public static function table(): Builder
     {
         return DB::table('browser_devices');
     }
@@ -117,7 +118,7 @@ final class BrowserDevices
         Cookie::queue(Cookie::forget(self::COOKIE));
     }
 
-    public static function active(\Illuminate\Database\Query\Builder $query): \Illuminate\Database\Query\Builder
+    public static function active(Builder $query): Builder
     {
         return $query->where(function ($query): void {
             $query->where('last_active_at', '>', now()->subMinutes(config('session.lifetime')))

@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Sanctum\TransientToken;
 
 #[Group('Authentication')]
 class LogoutController extends Controller
@@ -17,7 +18,7 @@ class LogoutController extends Controller
     #[Endpoint(title: 'Logout', description: 'Revoke the current API token.')]
     public function __invoke(Request $request): Response
     {
-        /** @var PersonalAccessToken|\Laravel\Sanctum\TransientToken|null $token */
+        /** @var PersonalAccessToken|TransientToken|null $token */
         $token = $request->user()->currentAccessToken();
 
         if ($token instanceof PersonalAccessToken) {

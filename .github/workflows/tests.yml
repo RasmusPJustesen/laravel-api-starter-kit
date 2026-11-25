@@ -24,13 +24,10 @@ jobs:
       - run: cp .env.example .env && php artisan key:generate
       - run: touch database/database.sqlite && php artisan migrate --force
       - name: Laravel Pint
-        run: |
-          vendor/bin/pint
-          python3 scripts/report-format.py
-          git diff --exit-code -- '*.php'
+        run: composer lint:check
       - name: Larastan
         if: ${{ !cancelled() }}
-        run: vendor/bin/phpstan analyse --no-progress --error-format=table
+        run: composer types:check -- --no-progress --error-format=table
   test:
     runs-on: ubuntu-latest
     strategy:

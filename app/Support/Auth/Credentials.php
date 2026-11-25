@@ -3,21 +3,23 @@
 namespace App\Support\Auth;
 
 use App\Models\User;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Sanctum\TransientToken;
 
 final class Credentials
 {
-    public static function sessions(): \Illuminate\Database\Query\Builder
+    public static function sessions(): Builder
     {
         return DB::connection(config('session.connection'))->table(config('session.table', 'sessions'));
     }
 
     public static function revokeOthers(Request $request, User $user): void
     {
-        /** @var PersonalAccessToken|\Laravel\Sanctum\TransientToken|null $current */
+        /** @var PersonalAccessToken|TransientToken|null $current */
         $current = $request->user()->currentAccessToken();
         $tokens = $user->tokens();
 

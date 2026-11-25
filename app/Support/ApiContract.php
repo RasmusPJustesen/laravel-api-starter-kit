@@ -22,8 +22,8 @@ use Illuminate\Support\Facades\Route;
 final class ApiContract
 {
     /**
-     * @param array<string, Type> $properties
-     * @param list<string>|null $required
+     * @param  array<string, Type>  $properties
+     * @param  list<string>|null  $required
      */
     private static function object(array $properties, ?array $required = null): ObjectType
     {

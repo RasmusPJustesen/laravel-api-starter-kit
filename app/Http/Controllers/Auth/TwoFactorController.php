@@ -11,26 +11,29 @@ use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
+use PragmaRX\Google2FA\Google2FA;
 
 class TwoFactorController extends Controller
 {
-    public function show(Request $request): \Illuminate\Http\JsonResponse
+    public function show(Request $request): JsonResponse
     {
         return response()->json(['enabled' => TwoFactor::enabled($request->user()), 'pending' => $request->user()->two_factor_secret !== null && ! TwoFactor::enabled($request->user())]);
     }
 
-    public function store(Request $request): \Illuminate\Http\Response
+    public function store(Request $request): Response
     {
         DB::transaction(function () use ($request): void {
             $user = User::query()->lockForUpdate()->whereKey($request->user()->getKey())->firstOrFail();
             abort_if(TwoFactor::enabled($user), 409);
             $user->forceFill([
-                'two_factor_secret' => Crypt::encryptString(app(\PragmaRX\Google2FA\Google2FA::class)->generateSecretKey(32)),
+                'two_factor_secret' => Crypt::encryptString(app(Google2FA::class)->generateSecretKey(32)),
                 'two_factor_recovery_codes' => Crypt::encryptString(json_encode(TwoFactor::generateRecoveryCodes(), JSON_THROW_ON_ERROR)),
                 'two_factor_confirmed_at' => null,
                 'two_factor_last_step' => null,
@@ -40,7 +43,7 @@ class TwoFactorController extends Controller
         return response()->noContent();
     }
 
-    public function setup(Request $request, TwoFactorAuthenticationProvider $provider): \Illuminate\Http\JsonResponse
+    public function setup(Request $request, TwoFactorAuthenticationProvider $provider): JsonResponse
     {
         $user = $request->user();
         abort_unless($user->two_factor_secret && ! TwoFactor::enabled($user), 409);
@@ -52,7 +55,7 @@ class TwoFactorController extends Controller
         ])->header('Cache-Control', 'no-store');
     }
 
-    public function qrCode(Request $request, TwoFactorAuthenticationProvider $provider): \Illuminate\Http\JsonResponse
+    public function qrCode(Request $request, TwoFactorAuthenticationProvider $provider): JsonResponse
     {
         $user = $request->user();
         abort_unless($user->two_factor_secret && ! TwoFactor::enabled($user), 409);
@@ -66,7 +69,7 @@ class TwoFactorController extends Controller
         return response()->json(['svg' => $svg, 'url' => $url])->header('Cache-Control', 'no-store');
     }
 
-    public function confirm(Request $request): \Illuminate\Http\Response
+    public function confirm(Request $request): Response
     {
         $data = $request->validate(['code' => ['required', 'string', 'regex:/^\d{6}$/D']]);
 
@@ -86,7 +89,7 @@ class TwoFactorController extends Controller
         return response()->noContent();
     }
 
-    public function recoveryCodes(Request $request): \Illuminate\Http\JsonResponse
+    public function recoveryCodes(Request $request): JsonResponse
     {
         $user = $request->user();
         abort_unless(TwoFactor::enabled($user), 409);
@@ -94,7 +97,7 @@ class TwoFactorController extends Controller
         return response()->json(['codes' => json_decode(Crypt::decryptString($user->two_factor_recovery_codes), true, 512, JSON_THROW_ON_ERROR)])->header('Cache-Control', 'no-store');
     }
 
-    public function regenerate(Request $request): \Illuminate\Http\JsonResponse
+    public function regenerate(Request $request): JsonResponse
     {
         $codes = DB::transaction(function () use ($request) {
             $user = User::query()->lockForUpdate()->whereKey($request->user()->getKey())->firstOrFail();
@@ -110,7 +113,7 @@ class TwoFactorController extends Controller
         return response()->json(['codes' => $codes])->header('Cache-Control', 'no-store');
     }
 
-    public function destroy(Request $request): \Illuminate\Http\Response
+    public function destroy(Request $request): Response
     {
         abort_if(config('starter-kit.require_two_factor'), 403, __('Two-factor authentication is required.'));
         DB::transaction(function () use ($request): void {

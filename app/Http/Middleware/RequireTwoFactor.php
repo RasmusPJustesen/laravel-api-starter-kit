@@ -6,10 +6,11 @@ use App\Support\ApiErrors;
 use App\Support\Auth\TwoFactor;
 use Closure;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class RequireTwoFactor
 {
-    public function handle(Request $request, Closure $next): \Symfony\Component\HttpFoundation\Response
+    public function handle(Request $request, Closure $next): Response
     {
         if (! config('starter-kit.require_two_factor') || TwoFactor::enabled($request->user())) {
             return $next($request);

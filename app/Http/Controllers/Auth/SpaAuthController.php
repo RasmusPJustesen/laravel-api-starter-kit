@@ -11,13 +11,15 @@ use App\Support\Auth\BrowserDevices;
 use App\Support\Auth\LoginChallenge;
 use App\Support\Auth\TwoFactor;
 use Illuminate\Auth\Events\Registered;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class SpaAuthController extends Controller
 {
-    public function login(LoginRequest $request): \Illuminate\Http\JsonResponse|\Illuminate\Http\Response
+    public function login(LoginRequest $request): JsonResponse|Response
     {
         return DB::transaction(function () use ($request) {
             $user = User::query()->where('email', $request->string('email'))->lockForUpdate()->first();
@@ -36,7 +38,7 @@ class SpaAuthController extends Controller
         });
     }
 
-    public function register(RegisterRequest $request): \Illuminate\Http\JsonResponse
+    public function register(RegisterRequest $request): JsonResponse
     {
         $user = User::create($request->validated());
         event(new Registered($user));

@@ -5,13 +5,14 @@ namespace App\Support\Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Sanctum\TransientToken;
 
 final class PasswordConfirmation
 {
     private static function key(Request $request): string
     {
         $user = $request->user();
-        /** @var PersonalAccessToken|\Laravel\Sanctum\TransientToken|null $token */
+        /** @var PersonalAccessToken|TransientToken|null $token */
         $token = $user->currentAccessToken();
         $id = $token instanceof PersonalAccessToken ? 'token:'.$token->getKey() : 'session:'.$request->session()->getId();
 

@@ -2,16 +2,20 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Events\DeviceSessionsRevoked;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\Auth\BrowserDevices;
 use App\Support\Auth\Credentials;
 use App\Support\Auth\UserAgent;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Sanctum\TransientToken;
 
 class SessionController extends Controller
 {
@@ -24,7 +28,7 @@ class SessionController extends Controller
     private function records(Request $request): array
     {
         $user = $request->user();
-        /** @var PersonalAccessToken|\Laravel\Sanctum\TransientToken|null $current */
+        /** @var PersonalAccessToken|TransientToken|null $current */
         $current = $user->currentAccessToken();
         $items = [];
         $tokens = $user->tokens()->get();
@@ -81,12 +85,12 @@ class SessionController extends Controller
         return $items;
     }
 
-    public function index(Request $request): \Illuminate\Http\JsonResponse
+    public function index(Request $request): JsonResponse
     {
         return response()->json(['data' => array_map(fn ($item) => ['type' => 'sessions', 'id' => $item['data']['id'], 'attributes' => array_diff_key($item['data'], ['id' => true]) + UserAgent::describe($item['data']['user_agent'])], $this->records($request))]);
     }
 
-    public function destroy(Request $request, string $session): \Illuminate\Http\Response
+    public function destroy(Request $request, string $session): Response
     {
         $record = collect($this->records($request))->first(fn ($item) => hash_equals($item['data']['id'], $session));
         abort_unless($record !== null, 404);
@@ -113,24 +117,24 @@ class SessionController extends Controller
                 Credentials::sessions()->where('user_id', $request->user()->getKey())->where('id', $record['key'])->delete();
                 $request->user()->forceFill(['remember_token' => Str::random(60)])->save();
             }
-            DB::afterCommit(fn () => event(new \App\Events\DeviceSessionsRevoked($user, 'single', $session)));
+            DB::afterCommit(fn () => event(new DeviceSessionsRevoked($user, 'single', $session)));
         });
 
         return response()->noContent();
     }
 
-    public function others(Request $request): \Illuminate\Http\Response
+    public function others(Request $request): Response
     {
         DB::transaction(function () use ($request): void {
             $user = User::query()->lockForUpdate()->whereKey($request->user()->getKey())->firstOrFail();
             Credentials::revokeOthers($request, $user);
-            DB::afterCommit(fn () => event(new \App\Events\DeviceSessionsRevoked($user, 'others')));
+            DB::afterCommit(fn () => event(new DeviceSessionsRevoked($user, 'others')));
         });
 
         return response()->noContent();
     }
 
-    public function update(Request $request, string $session): \Illuminate\Http\Response
+    public function update(Request $request, string $session): Response
     {
         $data = $request->validate(['name' => ['required', 'string', 'max:255']]);
         $record = collect($this->records($request))->first(fn ($item) => hash_equals($item['data']['id'], $session));

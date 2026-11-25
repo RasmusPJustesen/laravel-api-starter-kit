@@ -45,8 +45,8 @@ final class FrontendClients
     }
 
     /**
-     * @param array<string, mixed> $client
-     * @param array<string, mixed> $parameters
+     * @param  array<string, mixed>  $client
+     * @param  array<string, mixed>  $parameters
      */
     public static function link(array $client, string $pathKey, array $parameters = []): string
     {

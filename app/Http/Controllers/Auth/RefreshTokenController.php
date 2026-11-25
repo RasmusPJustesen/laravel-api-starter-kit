@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Sanctum\TransientToken;
 
 #[Group('Authentication')]
 class RefreshTokenController extends Controller
@@ -20,7 +21,7 @@ class RefreshTokenController extends Controller
     {
         $user = $request->user();
 
-        /** @var PersonalAccessToken|\Laravel\Sanctum\TransientToken|null $current */
+        /** @var PersonalAccessToken|TransientToken|null $current */
         $current = $user->currentAccessToken();
         abort_unless($current instanceof PersonalAccessToken, 403);
         $token = DB::transaction(function () use ($request, $user, $current): string {
@@ -28,7 +29,7 @@ class RefreshTokenController extends Controller
             $locked = $user->tokens()->lockForUpdate()->whereKey($current->getKey())->first();
             abort_unless($locked !== null, 401);
             $name = $locked->name;
-            $abilities = $locked->abilities ?? ['*'];
+            $abilities = array_values(array_filter($locked->abilities ?? ['*'], 'is_string'));
             $deviceId = $locked->device_id;
             $locked->delete();
 

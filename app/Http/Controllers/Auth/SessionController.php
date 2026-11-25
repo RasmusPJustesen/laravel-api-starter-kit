@@ -29,7 +29,7 @@ class SessionController extends Controller
                 continue;
             }
 
-            $items[] = ['key' => $token->getKey(), 'kind' => 'token', 'data' => [
+            $items[] = ['key' => $token->getKey(), 'device_id' => $token->device_id, 'kind' => 'token', 'data' => [
                 'id' => $this->opaque('token', $token->device_id ?? (string) $token->getKey()),
                 'name' => $token->name,
                 'authentication_type' => 'bearer',
@@ -87,8 +87,15 @@ class SessionController extends Controller
         abort_if($record['data']['is_current'], 409, __('Use logout to end the current session.'));
 
         DB::transaction(function () use ($request, $record): void {
+            $user = \App\Models\User::query()->lockForUpdate()->findOrFail($request->user()->getKey());
             if ($record['kind'] === 'token') {
-                $request->user()->tokens()->whereKey($record['key'])->delete();
+                $query = $user->tokens();
+                if ($record['device_id']) {
+                    $query->where('device_id', $record['device_id']);
+                } else {
+                    $query->whereKey($record['key']);
+                }
+                $query->delete();
             } elseif ($record['kind'] === 'browser') {
                 $device = \App\Support\Auth\BrowserDevices::table()->where('user_id', $request->user()->getKey())->where('id', $record['key']);
                 $sessionId = $device->value('session_id');
@@ -107,7 +114,10 @@ class SessionController extends Controller
 
     public function others(Request $request)
     {
-        DB::transaction(fn () => Credentials::revokeOthers($request, $request->user()));
+        DB::transaction(function () use ($request): void {
+            $user = \App\Models\User::query()->lockForUpdate()->findOrFail($request->user()->getKey());
+            Credentials::revokeOthers($request, $user);
+        });
 
         return response()->noContent();
     }
@@ -121,7 +131,13 @@ class SessionController extends Controller
             \App\Support\Auth\BrowserDevices::table()->where('user_id', $request->user()->getKey())->where('id', $record['key'])->update(['name' => $data['name']]);
         } else {
             abort_unless($record['kind'] === 'token', 422, __('Legacy browser sessions cannot be renamed.'));
-            $request->user()->tokens()->whereKey($record['key'])->update(['name' => $data['name']]);
+            $query = $request->user()->tokens();
+            if ($record['device_id']) {
+                $query->where('device_id', $record['device_id']);
+            } else {
+                $query->whereKey($record['key']);
+            }
+            $query->update(['name' => $data['name']]);
         }
 
         return response()->noContent();

@@ -15,6 +15,7 @@ return [
         'authentication' => (int) env('AUTH_RATE_LIMIT', 5),
         'verification' => (int) env('AUTH_VERIFICATION_RATE_LIMIT', 6),
         'sensitive' => (int) env('AUTH_SENSITIVE_RATE_LIMIT', 5),
+        'sensitive-read' => (int) env('AUTH_SENSITIVE_READ_RATE_LIMIT', 30),
     ],
     'account_deletion' => env('STARTER_KIT_ACCOUNT_DELETION', true),
     'challenge_lifetime' => (int) env('AUTH_CHALLENGE_LIFETIME', 300),

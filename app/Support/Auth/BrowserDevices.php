@@ -51,7 +51,7 @@ final class BrowserDevices
 
     public static function restore(Request $request): void
     {
-        if (! $request->hasSession() || config('starter-kit.authentication') === 'stateless' || $request->bearerToken()) {
+        if (! $request->hasSession() || config('starter-kit.authentication') === 'stateless') {
             return;
         }
 
@@ -84,13 +84,11 @@ final class BrowserDevices
         }
 
         DB::transaction(function () use ($request, $id, $secret, $guard): void {
+            $candidate = self::table()->where('id', $id)->first();
+            $user = $candidate ? User::query()->lockForUpdate()->find($candidate->user_id) : null;
             $device = self::table()->where('id', $id)->lockForUpdate()->first();
-            if (! $device || ! $device->remember_hash || ! hash_equals($device->remember_hash, hash('sha256', $secret)) || now()->gte($device->remember_until)) {
+            if (! $user || ! $device || ! $device->remember_hash || ! hash_equals($device->remember_hash, hash('sha256', $secret)) || now()->gte($device->remember_until)) {
                 Cookie::queue(Cookie::forget(self::COOKIE));
-                return;
-            }
-            $user = User::find($device->user_id);
-            if (! $user) {
                 return;
             }
             $guard->login($user, false);

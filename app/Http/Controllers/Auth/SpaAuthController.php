@@ -17,7 +17,8 @@ class SpaAuthController extends Controller
 {
     public function login(LoginRequest $request)
     {
-        $user = User::query()->where('email', $request->string('email'))->first();
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($request) {
+        $user = User::query()->where('email', $request->string('email'))->lockForUpdate()->first();
         $hash = $user?->getAuthPassword() ?? '$2y$12$OoT8jJofGjVA6q9C3/FvNeplQTQg0JAeDakKw2oy4vBvK/eAEksCW';
         if (! \Illuminate\Support\Facades\Hash::check($request->string('password'), $hash) || ! $user) {
             throw ValidationException::withMessages(['email' => [__('auth.failed')]]);
@@ -30,6 +31,7 @@ class SpaAuthController extends Controller
         \App\Support\Auth\BrowserDevices::login($request, $user, $request->boolean('remember'), (string) $request->string('device_name', 'Browser'));
 
         return response()->noContent();
+        });
     }
 
     public function register(RegisterRequest $request)

@@ -31,6 +31,7 @@ final class Credentials
             $devices->where('id', '!=', $request->session()->get('browser_device_id', ''));
         }
         $devices->delete();
+        DB::table('authentication_challenges')->where('user_id', $user->getKey())->delete();
 
         if (config('session.driver') === 'database') {
             $sessions = self::sessions()->where('user_id', $user->getKey());

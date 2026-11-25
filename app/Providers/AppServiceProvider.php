@@ -33,9 +33,17 @@ class AppServiceProvider extends ServiceProvider
             fn ($token, bool $valid): bool => $valid && config('starter-kit.authentication') !== 'stateful'
         );
         foreach (config('starter-kit.rate_limits') as $name => $attempts) {
-            \Illuminate\Support\Facades\RateLimiter::for('starter-'.$name, fn (\Illuminate\Http\Request $request) =>
-                \Illuminate\Cache\RateLimiting\Limit::perMinute(max(1, $attempts))->by($request->ip())
-            );
+            \Illuminate\Support\Facades\RateLimiter::for('starter-'.$name, function (\Illuminate\Http\Request $request) use ($name, $attempts) {
+                $limits = [\Illuminate\Cache\RateLimiting\Limit::perMinute(max(1, $attempts))->by('ip:'.$request->ip())];
+                if ($name === 'authentication') {
+                    $key = (string) ($request->input('challenge_token') ?: $request->input('email', ''));
+                    if ($key !== '') {
+                        $limits[] = \Illuminate\Cache\RateLimiting\Limit::perMinute(max(1, $attempts))->by('credential:'.hash('sha256', strtolower($key)));
+                    }
+                }
+
+                return $limits;
+            });
         }
 
         \Illuminate\Support\Facades\Event::listen(\App\Events\AccountSecurityChanged::class, function (\App\Events\AccountSecurityChanged $event): void {

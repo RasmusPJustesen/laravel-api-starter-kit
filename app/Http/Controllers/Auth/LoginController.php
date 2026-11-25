@@ -19,7 +19,8 @@ class LoginController extends Controller
     #[Endpoint(title: 'Login', description: 'Authenticate a user and return an API token.')]
     public function __invoke(LoginRequest $request): JsonResponse
     {
-        $user = User::query()
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($request): JsonResponse {
+        $user = User::query()->lockForUpdate()
             ->where('email', (string) $request->string('email'))
             ->first();
         $password = (string) $request->string('password');
@@ -45,5 +46,6 @@ class LoginController extends Controller
         $token = \App\Support\Auth\DeviceTokens::issue($user, $request, (string) $request->string('device_name', 'auth'))->plainTextToken;
 
         return response()->json(['token' => $token]);
+        });
     }
 }

@@ -39,7 +39,7 @@ Errors contain a stable error_details array with status, code, detail and an opt
 
 The paths below assume the default name, team. With a custom name, substitute the generated plural/singular identifiers.
 
-- GET, POST /teams; GET, PATCH, DELETE /teams/{team}; POST /teams/{team}/leave.
+- GET, POST /teams; GET, PATCH, DELETE /teams/{team}; DELETE /teams/{team}/leave.
 - GET /teams/{team}/members; PATCH, DELETE /teams/{team}/members/{user}.
 - GET, POST /teams/{team}/invitations; DELETE /teams/{team}/invitations/{invitation}.
 - GET /user/invitations; POST /invitations/{invitation}/accept; DELETE /invitations/{invitation}.

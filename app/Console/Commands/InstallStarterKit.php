@@ -63,12 +63,15 @@ class InstallStarterKit extends Command
         if (! File::exists($env)) {
             File::copy(base_path('.env.example'), $env);
         }
-        $content = File::get($env);
-        $line = 'STARTER_KIT_AUTH='.$auth;
-        $content = preg_match('/^STARTER_KIT_AUTH=.*$/m', $content)
-            ? preg_replace('/^STARTER_KIT_AUTH=.*$/m', $line, $content)
-            : rtrim($content).PHP_EOL.$line.PHP_EOL;
-        File::put($env, $content);
+        // Persist the chosen authentication mode for future environments too.
+        foreach ([$env, base_path('.env.example')] as $path) {
+            $content = File::get($path);
+            $line = 'STARTER_KIT_AUTH='.$auth;
+            $content = preg_match('/^STARTER_KIT_AUTH=.*$/m', $content)
+                ? preg_replace('/^STARTER_KIT_AUTH=.*$/m', $line, $content)
+                : rtrim($content).PHP_EOL.$line.PHP_EOL;
+            File::put($path, $content);
+        }
         if ($frontends !== null) {
             File::put(config_path('frontend-clients.php'), "<?php\n\nreturn ".var_export($frontends, true).";\n");
         }
@@ -119,7 +122,7 @@ class InstallStarterKit extends Command
             $id = $definition['id'] ?? '';
             $url = $definition['url'] ?? '';
             $mode = $definition['authentication'] ?? ($auth === 'both' ? 'stateful' : $auth);
-            $origin = $definition['origin'] ?? ($mode === 'stateful' ? FrontendClients::origin($url) : null);
+            $origin = $definition['origin'] ?? ($mode === 'stateful' && is_string($url) ? FrontendClients::origin($url) : null);
             if (! is_string($id) || ! preg_match('/^[a-z][a-z0-9_-]{0,39}$/D', $id) || isset($clients[$id]) ||
                 ! is_string($url) || ! FrontendClients::origin($url) ||
                 parse_url($url, PHP_URL_QUERY) !== null || parse_url($url, PHP_URL_FRAGMENT) !== null ||

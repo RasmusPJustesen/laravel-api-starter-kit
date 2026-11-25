@@ -88,7 +88,7 @@ Copy `generated/openapi.json` and `generated/api.d.ts` into your Nuxt, Capacitor
 
 ## Configure and deploy
 
-See [configuration and deployment](docs/configuration.md), [authentication and teams](docs/api.md), and [security reporting](SECURITY.md).
+See [configuration and deployment](docs/configuration.md), [authentication and teams](docs/api.md), [security reporting](SECURITY.md), and the [release checklist](docs/releasing.md).
 
 ```sh
 composer lint:check

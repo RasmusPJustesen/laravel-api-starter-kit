@@ -128,7 +128,20 @@ jobs:
           node-version: '22'
       - run: composer install --no-interaction --prefer-dist
       - run: cp .env.example .env && php artisan key:generate
-      - run: php artisan starter-kit:install --no-teams --auth="$STARTER_KIT_AUTH" --no-interaction
+      - name: Configure selected authentication mode and validate installer input
+        run: |
+          if php artisan starter-kit:install --no-teams --auth="$STARTER_KIT_AUTH" --frontend='{"id":"bad","url":42}' --no-interaction; then
+            echo "Invalid frontend was unexpectedly accepted"
+            exit 1
+          fi
+          test ! -f .starter-kit-installed
+          if [ "$STARTER_KIT_AUTH" = stateful ]; then
+            php artisan starter-kit:install --no-teams --auth=stateful --frontend='{"id":"web","url":"http://127.0.0.1:3000","authentication":"stateful"}' --no-interaction
+          else
+            php artisan starter-kit:install --no-teams --auth=stateless --frontend='{"id":"mobile","url":"https://mobile.example.test","authentication":"stateless"}' --no-interaction
+          fi
+          grep -Fx "STARTER_KIT_AUTH=$STARTER_KIT_AUTH" .env.example
+          test -f config/frontend-clients.php
       - run: touch database/database.sqlite && php artisan migrate --force
       - run: npm install --ignore-scripts && composer api:generate
       - run: |

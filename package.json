@@ -1,7 +1,8 @@
 {
     "private": true,
     "scripts": {
-        "api:types": "openapi-typescript generated/openapi.json -o generated/api.d.ts"
+        "api:types": "openapi-typescript generated/openapi.json -o generated/api.d.ts",
+        "build": "php artisan scramble:export --path=generated/openapi.json && npm run api:types"
     },
     "devDependencies": {
         "openapi-typescript": "^7.0.0",

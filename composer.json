@@ -10,7 +10,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
-        "dedoc/scramble": "^0.13.35",
+        "dedoc/scramble": "^0.13.55",
         "laravel/framework": "^13.17",
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^3.0",
@@ -43,12 +43,11 @@
         "setup": [
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
-            "@php artisan key:generate",
-            "@php artisan migrate --force"
+            "@php scripts/install-project.php"
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "@php artisan dev"
+            "@php artisan serve"
         ],
         "lint": [
             "pint --parallel"
@@ -57,7 +56,8 @@
             "pint --parallel --test"
         ],
         "ci:check": [
-            "Composer\\Config::disableProcessTimeout",
+            "@lint:check",
+            "@types:check",
             "@test"
         ],
         "types:check": [
@@ -80,7 +80,7 @@
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi",
             "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
-            "@php artisan starter-kit:install"
+            "@php scripts/install-project.php"
         ],
         "pre-package-uninstall": [
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
@@ -92,7 +92,13 @@
     },
     "extra": {
         "laravel": {
-            "dont-discover": []
+            "dont-discover": [],
+            "installer": {
+                "post-create-project": [
+                    "@php artisan starter-kit:install",
+                    "@php artisan migrate --force"
+                ]
+            }
         }
     },
     "config": {

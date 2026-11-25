@@ -19,7 +19,7 @@ class InstallStarterKit extends Command
             return self::FAILURE;
         }
 
-        $interactive = $this->input->isInteractive();
+        $interactive = $this->input->isInteractive() && (! defined('STDIN') || stream_isatty(STDIN));
         $auth = $this->option('auth') ?? ($interactive ? $this->choice('Authentication', ['both', 'stateless', 'stateful'], 'both') : 'both');
 
         if (! in_array($auth, ['both', 'stateless', 'stateful'], true)) {
@@ -69,6 +69,12 @@ class InstallStarterKit extends Command
         }
 
         File::put(base_path('.starter-kit-installed'), "configured\n");
+
+        // Generated applications use ordinary application CI, not the template matrix.
+        if (File::exists(base_path('stubs/project/tests.yml.stub'))) {
+            File::ensureDirectoryExists(base_path('.github/workflows'));
+            File::copy(base_path('stubs/project/tests.yml.stub'), base_path('.github/workflows/tests.yml'));
+        }
         $this->info('Configuration saved. Run php artisan optimize:clear and php artisan migrate.');
 
         return self::SUCCESS;

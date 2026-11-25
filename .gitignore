@@ -16,3 +16,5 @@ Homestead.yaml
 /.nova
 /.vscode
 /.zed
+
+# Generated configuration manifests are tracked in application repositories.

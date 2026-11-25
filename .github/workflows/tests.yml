@@ -11,6 +11,26 @@ permissions:
   contents: read
 
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+          extensions: pdo_sqlite
+      - run: composer install --no-interaction --prefer-dist
+      - run: cp .env.example .env && php artisan key:generate
+      - run: touch database/database.sqlite && php artisan migrate --force
+      - name: Laravel Pint
+        run: |
+          vendor/bin/pint
+          python3 scripts/report-format.py
+          git diff --exit-code -- '*.php'
+      - name: Larastan
+        if: ${{ !cancelled() }}
+        run: vendor/bin/phpstan analyse --no-progress --error-format=table
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -85,3 +105,114 @@ jobs:
           node scripts/http-smoke.mjs
       - if: ${{ !cancelled() && steps.configure.outcome == 'success' }}
         run: composer audit
+
+  auth-mode:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [stateful, stateless]
+    env:
+      STARTER_KIT_AUTH: ${{ matrix.mode }}
+      APP_URL: http://127.0.0.1:8000
+      FRONTEND_WEB_URL: http://127.0.0.1:3000
+      FRONTEND_WEB_ORIGIN: http://127.0.0.1:3000
+      FRONTEND_MOBILE_URL: https://mobile.example.test
+      AUTH_RATE_LIMIT: 100
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+          extensions: pdo_sqlite
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: composer install --no-interaction --prefer-dist
+      - run: cp .env.example .env && php artisan key:generate
+      - run: php artisan starter-kit:install --no-teams --auth="$STARTER_KIT_AUTH" --no-interaction
+      - run: touch database/database.sqlite && php artisan migrate --force
+      - run: npm install --ignore-scripts && composer api:generate
+      - run: |
+          php artisan serve --host=127.0.0.1 --port=8000 > /tmp/starter-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; tail -n 40 /tmp/starter-server.log' EXIT
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/ready > /dev/null; then break; fi
+            sleep 1
+          done
+          node scripts/http-smoke.mjs
+  databases:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: test-password
+          MYSQL_DATABASE: starter_kit
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping -h localhost" --health-interval=5s --health-timeout=5s --health-retries=20
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: test-password
+          POSTGRES_DB: starter_kit
+        ports:
+          - 5432:5432
+        options: --health-cmd="pg_isready -U postgres" --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+          extensions: pdo_mysql, pdo_pgsql, pdo_sqlite
+      - run: composer install --no-interaction --prefer-dist
+      - run: cp .env.example .env && php artisan key:generate
+      - run: php artisan starter-kit:install --teams --team-name=workspace --no-interaction
+      - name: MySQL integration suite
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: starter_kit
+          DB_USERNAME: root
+          DB_PASSWORD: test-password
+        run: php artisan test
+      - name: PostgreSQL integration suite
+        if: ${{ !cancelled() }}
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: starter_kit
+          DB_USERNAME: postgres
+          DB_PASSWORD: test-password
+        run: php artisan test
+  installation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+          extensions: pdo_sqlite
+      - name: Install independent Composer project
+        run: |
+          mkdir -p /tmp/starter-source
+          git archive HEAD | tar -x -C /tmp/starter-source
+          composer create-project --repository='{"type":"path","url":"/tmp/starter-source","options":{"symlink":false,"versions":{"rasmuspjustesen/laravel-api-starter-kit":"dev-main"}}}' --stability=dev --no-interaction --remove-vcs rasmuspjustesen/laravel-api-starter-kit /tmp/starter-application dev-main
+          cd /tmp/starter-application
+          test ! -d .git
+          test -f .starter-kit-installed
+          php artisan migrate:status
+          php artisan tinker --execute='App\\Models\\User::factory()->create(["email" => "existing@example.test"]);'
+          php artisan starter-kit:teams --team-name=workspace --team-plural=collectives --personal-teams --no-interaction
+          composer dump-autoload
+          php artisan optimize:clear
+          php artisan migrate --force
+          php artisan tinker --execute='if (! App\\Models\\User::where("email", "existing@example.test")->firstOrFail()->personalWorkspace()) { throw new RuntimeException("Personal workspace not provisioned"); }'
+          php artisan test

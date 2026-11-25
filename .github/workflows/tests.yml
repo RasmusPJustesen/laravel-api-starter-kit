@@ -14,7 +14,7 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
@@ -45,7 +45,7 @@ jobs:
           - variant: study_group
             php: '8.4'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
@@ -117,7 +117,7 @@ jobs:
       FRONTEND_MOBILE_URL: https://mobile.example.test
       AUTH_RATE_LIMIT: 100
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
@@ -160,7 +160,7 @@ jobs:
           - 5432:5432
         options: --health-cmd="pg_isready -U postgres" --health-interval=5s --health-timeout=5s --health-retries=20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
@@ -191,7 +191,7 @@ jobs:
   installation:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
